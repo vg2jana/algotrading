@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 import pandas_datareader.data as pdr
 import datetime
-from indicator.symbol import Symbol
+from indicator.base_symbol import Symbol
 
 
 if __name__ == '__main__':
@@ -33,12 +33,14 @@ if __name__ == '__main__':
                               'WBC.AX', 'WPL.AX', 'WOW.AX', 'WOR.AX']
     }
 
-    # for category, symbols in symbols.items():
-    #     for symbol in symbols:
-    #         print('Fetching data for symbol {}'.format(symbol))
-    #         s = Symbol(conn, symbol, frequency='1d', category=category, series_length=252)
-    #         data = s.fetch_data()
-    #         if data is not None:
-    #             s.write_to_db(data)
-    s = Symbol(conn, 'XBTUSD', frequency='5m', category=None, series_length=252)
+    for category, symbols in symbols.items():
+        for symbol in symbols:
+            if symbol != 'ASIANPAINT.NS':
+                continue
+            print('Fetching data for symbol {}'.format(symbol))
+            s = Symbol(symbol, conn=conn, frequency='1d', category=category, series_length=252)
+            data = s.fetch_pandas()
+            if data is not None:
+                s.write_to_db(data)
+                df = s.read_from_db()
     conn.close()

@@ -1,4 +1,5 @@
 from backtest.backtest import Backtest
+from datetime import datetime, timedelta
 
 
 class Strategy(Backtest):
@@ -13,6 +14,9 @@ class Strategy(Backtest):
         self.exit_index = None
 
     def setup(self):
+        pass
+
+    def teardown(self):
         pass
     
     def average_true_range(self, DF, n, weighted=False):
@@ -61,9 +65,9 @@ class Strategy(Backtest):
         pass
 
 
-class SinglePosition(Strategy):
+class SinglePositionBackTest(Strategy):
     def __init__(self, dataframe):
-        super(SinglePosition, self).__init__(dataframe)
+        super(SinglePositionBackTest, self).__init__(dataframe)
 
     def wait_for_signal(self):
         if self.enter_buy() is True:
@@ -82,10 +86,62 @@ class SinglePosition(Strategy):
 
             elif self.signal == 'Buy':
                 if self.exit_buy() is True or self.enter_sell() is True:
-                    self.close_position()
-                    self.signal = None
+                    if self.close_position() is True:
+                        self.signal = None
 
             elif self.signal == 'Sell':
                 if self.exit_sell() is True or self.enter_buy() is True:
-                    self.close_position()
+                    if self.close_position() is True:
+                        self.signal = None
+
+
+class SinglePosition(Strategy):
+    def __init__(self, dataframe):
+        super(SinglePosition, self).__init__(dataframe)
+
+    def before_run(self):
+        pass
+
+    def after_run(self):
+        pass
+
+    def wait_for_signal(self):
+        if self.enter_buy() is True:
+            self.signal = 'Buy'
+        elif self.enter_sell() is True:
+            self.signal = 'Sell'
+
+    def run(self):
+        if self.signal is None:
+            self.wait_for_signal()
+            if self.signal is not None:
+                self.open_position()
+
+        elif self.signal == 'Buy':
+            if self.exit_buy() is True or self.enter_sell() is True:
+                if self.close_position() is True:
                     self.signal = None
+
+        elif self.signal == 'Sell':
+            if self.exit_sell() is True or self.enter_buy() is True:
+                if self.close_position() is True:
+                    self.signal = None
+
+    def time_bound_run(self, seconds):
+        start_time = datetime.now()
+        lapsed_seconds = 0
+
+        # Run setup
+        self.setup()
+
+        # Being run
+        while lapsed_seconds <= seconds:
+            self.before_run()
+            self.run()
+            self.after_run()
+            curr_time = datetime.now()
+            lapsed_seconds = curr_time - start_time
+            lapsed_seconds = lapsed_seconds.total_seconds()
+
+        # Run teardown
+        self.teardown()

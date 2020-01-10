@@ -3,7 +3,7 @@ import pandas as pd
 from alpha_vantage.timeseries import TimeSeries
 import copy
 import sqlite3
-from indicator.symbol import *
+from indicator.base_symbol import *
 
 
 def ATR(DF,n):
