@@ -165,6 +165,7 @@ class BitMEXWebsocket:
         '''
 
         # You can sub to orderBookL2 for all levels, or orderBook10 for top 10 levels & save bandwidth
+        # symbolSubs = ["execution", "instrument", "order", "position", "trade"]
         symbolSubs = ["execution", "instrument", "order", "position", "trade"]
         genericSubs = ["margin"]
 
@@ -198,7 +199,7 @@ class BitMEXWebsocket:
         message = json.loads(message)
 
         table = message['table'] if 'table' in message else None
-        if table in ("position", "order"):
+        if table in ("order", ):
             self.logger.info(message)
         action = message['action'] if 'action' in message else None
         try:

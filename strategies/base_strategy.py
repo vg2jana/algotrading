@@ -5,11 +5,11 @@ from datetime import datetime, timedelta
 class Strategy(Backtest):
     def __init__(self, dataframe):
         super(Strategy, self).__init__()
-        self.dataframe = dataframe.copy()
+        self.dataframe = dataframe
         self.signal = None
         self.iter = None
-        self.entry_price = []
-        self.exit_price = []
+        self.entry_price = None
+        self.exit_price = None
         self.entry_index = None
         self.exit_index = None
 
@@ -34,11 +34,12 @@ class Strategy(Backtest):
         return df2['ATR']
     
     def rolling(self, n=20, weighted=False):
+        df = self.dataframe.copy()
         self.dataframe["ATR"] = self.average_true_range(self.dataframe, n, weighted=weighted)
         self.dataframe["roll_max_cp"] = self.dataframe["High"].rolling(n).max()
         self.dataframe["roll_min_cp"] = self.dataframe["Low"].rolling(n).min()
         self.dataframe["roll_max_vol"] = self.dataframe["Volume"].rolling(n).max()
-        self.dataframe.dropna(inplace=True)
+        # self.dataframe.dropna(inplace=True)
 
     def wait_for_signal(self):
         pass

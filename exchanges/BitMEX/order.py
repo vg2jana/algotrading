@@ -21,7 +21,7 @@ class Order:
         self.execType = None
         self.cumQty = None
         self.workingIndicator = None
-        self.parent_order = user.parent_order
+        # self.parent_order = user.parent_order
         self.wait = True
 
     def get_status(self):

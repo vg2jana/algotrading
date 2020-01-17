@@ -18,16 +18,16 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
 
     def open_position(self):
         i = self.iter
-        self.entry_price.append(self.dataframe["Open"][self.iter])
+        self.entry_price = self.dataframe["Open"][self.iter]
         self.entry_index = i
 
     def close_position(self):
         i = self.iter
         multiplier = -1 if self.signal == 'Sell' else 1
         exit_price = self.dataframe["Adj Close"][i-1] - (self.dataframe["ATR"][i-1] * multiplier)
-        net = (exit_price - self.entry_price[-1]) * multiplier
+        net = (exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
-            self.exit_price.append(self.dataframe["Adj Close"][i-1] - (self.dataframe["ATR"][i-1] * multiplier))
+            self.exit_price = self.dataframe["Adj Close"][i-1] - (self.dataframe["ATR"][i-1] * multiplier)
             self.exit_index = i
             self.returns.append((self.entry_index, self.exit_index, net))
             return True
@@ -106,23 +106,21 @@ class ResistanceBreakout(SinglePosition):
             self.update_dataframe()
 
     def open_position(self):
-        # self.entry_price.append(self.dataframe["Open"][-1])
-        # self.entry_index = len(self.dataframe) - 1
+        # Override this method to open a position. Use self.signal for Buy or Sell.
         print("Open position")
 
-    def close_position(self):
-        i = self.iter
+    def close_price_within_limits(self):
         multiplier = -1 if self.signal == 'Sell' else 1
-        exit_price = self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1] * multiplier)
-        net = (exit_price - self.entry_price[-1]) * multiplier
+        exit_price = self.book['ltp']
+        net = (exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
-            self.exit_price.append(self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1] * multiplier))
-            self.exit_index = i
-            self.returns.append((self.entry_index, self.exit_index, net))
-            print('Close position')
             return True
-
         return False
+
+    def close_position(self):
+        # Override this method to close open position.
+        # Use close_price_within_limits() to verify close price
+        print("Close position")
 
     def enter_buy(self):
         if self.dataframe["High"][-1] >= self.dataframe["roll_max_cp"][-1] and \
@@ -139,15 +137,14 @@ class ResistanceBreakout(SinglePosition):
         return False
 
     def exit_buy(self):
-        i = self.iter
-        if self.dataframe["Adj Close"][i] < self.dataframe["Adj Close"][i - 1] - self.dataframe["ATR"][i - 1]:
+        if self.dataframe["Adj Close"][-1] < self.dataframe["Adj Close"][-2] - self.dataframe["ATR"][-2]:
             return True
 
         return False
 
     def exit_sell(self):
         i = self.iter
-        if self.dataframe["Adj Close"][i] > self.dataframe["Adj Close"][i - 1] + self.dataframe["ATR"][i - 1]:
+        if self.dataframe["Adj Close"][-1] > self.dataframe["Adj Close"][-2] + self.dataframe["ATR"][-2]:
             return True
 
         return False

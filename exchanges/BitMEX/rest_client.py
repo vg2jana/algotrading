@@ -200,10 +200,29 @@ class RestClient:
             if response.status_code != 200:
                 self.logger.warning("Failed to fetch open position")
                 self.logger.warning("Status code: {}, Reason: {}".format(response.status_code, response.reason))
+                self.logger.warning("Position: {}".format(position))
                 position = None
 
         if position is not None and len(position) > 0:
             position = position[0]
+
+        return position
+
+    def close_position(self):
+
+        position = None
+
+        try:
+            position, response = self.api.Order.Order_closePosition(symbol=self.symbol).result()
+        except Exception as e:
+            self.logger.warning(e)
+            self.logger.warning("Failed to close open position")
+            time.sleep(2)
+        else:
+            if response.status_code != 200:
+                self.logger.warning("Failed to close open position")
+                self.logger.warning("Status code: {}, Reason: {}".format(response.status_code, response.reason))
+                self.logger.warning("Position: {}".format(position))
 
         return position
 
