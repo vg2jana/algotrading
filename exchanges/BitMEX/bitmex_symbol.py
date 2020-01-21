@@ -4,7 +4,7 @@ import pandas as pd
 import logging
 from indicator.base_symbol import Symbol
 from time import sleep
-from datetime import datetime
+from datetime import datetime, timedelta
 from strategies.res_brkout import ResistanceBreakoutBackTest, ResistanceBreakout
 
 
@@ -22,6 +22,7 @@ class BitMEXSymbol(Symbol):
         df1.rename(columns={"timestamp": "Datetime", "open": "Open", "high": "High", "low": "Low", "close": "Adj Close",
                             "volume": "Volume"}, inplace=True)
         df1.set_index('Datetime', inplace=True)
+        self.logger.info("UPDATE CANDLE:\n{}".format(str(data)))
         return df1
 
     def fetch_data(self, start_time, count=1000):
@@ -32,7 +33,6 @@ class BitMEXSymbol(Symbol):
         data = None
         while attempts > 0:
             data = self.client.trade_bucket(binSize=self.frequency, count=count, filter=filter)
-            self.logger.info(str((start_time, datetime.utcnow(), str(data))))
             if data is not None and len(data) > 0:
                 break
             sleep(1)
@@ -45,21 +45,22 @@ if __name__ == '__main__':
     def sample(key, secret):
         db = '/Users/jganesan/workspace/algotrading/symbols.sqlite3'
         conn = sqlite3.connect(db)
-        key = "UzlrFYMJJGo_A7QDihj3ZtY8"
-        secret = "LuA5rSvqLGDghJ8A-6ZtDEgahvbIroqFPpRdKd-uI3DPSXQG"
+        key = "MjLgBPoZey_vp3rQ7uM0riqA"
+        secret = "1AiC5B6cqs4hRSgBDPU_KyU3rSCyMiIrCoD1mkkT-LjP3ymJ"
         symbol = 'XBTUSD'
         frequency = '5m'
-        client = bitmex.bitmex(api_key=key, api_secret=secret)
+        client = client = RestClient(False, key, secret, symbol)
         xbt = BitMEXSymbol(symbol, conn=conn, client=client, frequency=frequency)
-        df1 = xbt.fetch_data()
+        df1 = xbt.fetch_data(datetime.utcnow() - timedelta(days=3), count=740)
         xbt.write_to_db(df1)
-        df = xbt.read_from_db()
+
         conn.close()
 
         s = ResistanceBreakoutBackTest(df)
         s.weighted = False
         s.rolling_period = 10
         s.min_profit = 13.5
+        s.min_loss = -20
         s.setup()
         s.run()
 

@@ -1,4 +1,4 @@
-import pytz
+import logging
 
 from datetime import datetime
 from strategies.base_strategy import SinglePositionBackTest, SinglePosition
@@ -14,7 +14,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
     
     def setup(self):
         # Calculate rolling
-        self.rolling(self.rolling_period, weighted=self.weighted)
+        self.rolling(self.rolling_period, weighted=self.weighted, dropna=True)
 
     def open_position(self):
         i = self.iter
@@ -83,6 +83,13 @@ class ResistanceBreakout(SinglePosition):
             '1d': 60 * 60 * 24
         }
         self.period = seconds[duration]
+        self.logger = logging.getLogger()
+
+    def setup(self):
+        # Close any open position
+        self.close_position()
+        # Calculate rolling
+        self.rolling(self.rolling_period, weighted=self.weighted)
 
     def update_book(self):
         # Override this method and update book info as per your exchange
@@ -93,9 +100,6 @@ class ResistanceBreakout(SinglePosition):
         pass
 
     def before_run(self):
-        # Calculate rolling
-        self.rolling(self.rolling_period, weighted=self.weighted)
-
         # Update Buy/Sell/Ltp book
         self.update_book()
 
@@ -103,17 +107,22 @@ class ResistanceBreakout(SinglePosition):
         curr_time = datetime.now(last_updated.tz)
         seconds = curr_time - last_updated.to_pydatetime()
         if seconds.total_seconds() >= self.period:
+            # Update candle
             self.update_dataframe()
+            # Calculate rolling
+            self.rolling(self.rolling_period, weighted=self.weighted)
 
     def open_position(self):
         # Override this method to open a position. Use self.signal for Buy or Sell.
+        # Also update self.position_index value
         print("Open position")
 
     def close_price_within_limits(self):
         multiplier = -1 if self.signal == 'Sell' else 1
         exit_price = self.book['ltp']
         net = (exit_price - self.entry_price) * multiplier
-        if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
+        if (net < 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
+            self.logger.info("CLOSE SATISFIED:\nEntry at: {}, Exit at: {}, Net: {}".format(self.entry_price, exit_price, net))
             return True
         return False
 
@@ -125,6 +134,7 @@ class ResistanceBreakout(SinglePosition):
     def enter_buy(self):
         if self.dataframe["High"][-1] >= self.dataframe["roll_max_cp"][-1] and \
                 self.dataframe["Volume"][-1] > 1.5 * self.dataframe["roll_max_vol"][-2]:
+            self.logger.info("Enter BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
         return False
@@ -132,19 +142,23 @@ class ResistanceBreakout(SinglePosition):
     def enter_sell(self):
         if self.dataframe["Low"][-1] <= self.dataframe["roll_max_cp"][-1] and \
                 self.dataframe["Volume"][-1] > 1.5 * self.dataframe["roll_max_vol"][-2]:
+            self.logger.info("Enter SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
         return False
 
     def exit_buy(self):
-        if self.dataframe["Adj Close"][-1] < self.dataframe["Adj Close"][-2] - self.dataframe["ATR"][-2]:
+        if self.dataframe["Adj Close"][-1] < self.dataframe["Adj Close"][-2] - self.dataframe["ATR"][-2] and \
+                self.close_price_within_limits() is True:
+            self.logger.info("Exit BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
         return False
 
     def exit_sell(self):
-        i = self.iter
-        if self.dataframe["Adj Close"][-1] > self.dataframe["Adj Close"][-2] + self.dataframe["ATR"][-2]:
+        if self.dataframe["Adj Close"][-1] > self.dataframe["Adj Close"][-2] + self.dataframe["ATR"][-2] and \
+                self.close_price_within_limits() is True:
+            self.logger.info("Exit SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
         return False

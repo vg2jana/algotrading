@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 class Strategy(Backtest):
     def __init__(self, dataframe):
         super(Strategy, self).__init__()
-        self.dataframe = dataframe
+        self.dataframe = dataframe.copy()
         self.signal = None
         self.iter = None
         self.entry_price = None
@@ -33,13 +33,14 @@ class Strategy(Backtest):
         df2 = df.drop(['H-L', 'H-PC', 'L-PC'], axis=1)
         return df2['ATR']
     
-    def rolling(self, n=20, weighted=False):
+    def rolling(self, n=20, weighted=False, dropna=False):
         df = self.dataframe.copy()
         self.dataframe["ATR"] = self.average_true_range(self.dataframe, n, weighted=weighted)
         self.dataframe["roll_max_cp"] = self.dataframe["High"].rolling(n).max()
         self.dataframe["roll_min_cp"] = self.dataframe["Low"].rolling(n).min()
         self.dataframe["roll_max_vol"] = self.dataframe["Volume"].rolling(n).max()
-        # self.dataframe.dropna(inplace=True)
+        if dropna is True:
+            self.dataframe.dropna(inplace=True)
 
     def wait_for_signal(self):
         pass
@@ -99,11 +100,15 @@ class SinglePositionBackTest(Strategy):
 class SinglePosition(Strategy):
     def __init__(self, dataframe):
         super(SinglePosition, self).__init__(dataframe)
+        self.last_frame = 0
 
     def before_run(self):
         pass
 
     def after_run(self):
+        pass
+
+    def close_price_within_limits(self):
         pass
 
     def wait_for_signal(self):
@@ -116,17 +121,30 @@ class SinglePosition(Strategy):
         if self.signal is None:
             self.wait_for_signal()
             if self.signal is not None:
-                self.open_position()
+                if self.open_position() is not True:
+                    self.signal = None
 
         elif self.signal == 'Buy':
-            if self.exit_buy() is True or self.enter_sell() is True:
-                if self.close_position() is True:
+            enter_sell = self.enter_sell()
+            if self.exit_buy() is True or (enter_sell is True and self.close_price_within_limits() is True):
+                self.close_position()
+                self.signal = None
+            if enter_sell is True:
+                self.signal = 'Sell'
+                if self.open_position() is not True:
                     self.signal = None
 
         elif self.signal == 'Sell':
-            if self.exit_sell() is True or self.enter_buy() is True:
-                if self.close_position() is True:
+            enter_buy = self.enter_buy()
+            if self.exit_sell() is True or (enter_buy is True and self.close_price_within_limits() is True):
+                self.close_position()
+                self.signal = None
+            if enter_buy is True:
+                self.signal = 'Buy'
+                if self.open_position() is not True:
                     self.signal = None
+
+        self.last_frame = len(self.dataframe)
 
     def time_bound_run(self, seconds):
         start_time = datetime.now()
@@ -138,7 +156,8 @@ class SinglePosition(Strategy):
         # Being run
         while lapsed_seconds <= seconds:
             self.before_run()
-            self.run()
+            if len(self.dataframe) > self.last_frame:
+                self.run()
             self.after_run()
             curr_time = datetime.now()
             lapsed_seconds = curr_time - start_time
