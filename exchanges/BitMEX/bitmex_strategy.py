@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from time import sleep
 from exchanges.BitMEX.bitmex_symbol import BitMEXSymbol
 from strategies.res_brkout import ResistanceBreakout, ResistanceBreakoutBackTest
+from strategies.renko_macd import RenkoMACDBackTest
 from exchanges.BitMEX.mywebsocket import MyWebSocket
 from exchanges.BitMEX.rest_client import RestClient
 from exchanges.BitMEX.order import Order
@@ -48,6 +49,7 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
                 order = Order(self)
                 status = order.new(orderQty=self.qty, ordType="Market", side=side)
                 if status is None:
+                    attempts -= 1
                     sleep(1)
                     continue
             order.get_status()
@@ -96,12 +98,14 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
 
 
 def backtest(key, secret, product, frequency):
+    # key = "VvD5-fMBfiZ9dlMtXP2pffHj"
+    # secret = "jROi3UZ5q_hkVW2RnK3xbCQEnTzpLXcnbOdUCJTnQFrrdUgj"
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
     dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=2)))
     backtest = ResistanceBreakoutBackTest(dataframe)
     backtest.weighted = False
-    backtest.rolling_period = 15
+    backtest.rolling_period = 14
     backtest.min_profit = 13.5
     backtest.min_loss = 0
     backtest.setup()
@@ -145,11 +149,11 @@ if __name__ == '__main__':
     websocket = MyWebSocket(endpoint, product, key, secret)
     websocket.connect_ws()
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
-    dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(hours=2), count=200))
+    dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(hours=4), count=200))
     res_bro = ResistanceBreakOutBitMEX(dataframe, symbol, websocket)
-    backtest = ResistanceBreakoutBackTest(dataframe)
+    backtest = ResistanceBreakout(dataframe)
     res_bro.weighted = False
     res_bro.rolling_period = 15
     res_bro.min_profit = 13.5
-    # res_bro.min_loss = -20
+    res_bro.min_loss = 0
     res_bro.time_bound_run(60 * 60 * 24 * 3)

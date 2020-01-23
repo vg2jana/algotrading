@@ -28,13 +28,13 @@ class RestClient:
     def new_order(self, **kwargs):
 
         kwargs['symbol'] = self.symbol
-        order = None
 
         try:
             order, response = self.api.Order.Order_new(**kwargs).result()
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Failed to place order with params: {}".format(kwargs))
+            order = None
             time.sleep(2)
         else:
             if response.status_code != 200:

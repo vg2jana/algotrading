@@ -1,3 +1,7 @@
+import numpy as np
+import statsmodels.api as sm
+
+from stocktrends import Renko
 from backtest.backtest import Backtest
 from datetime import datetime, timedelta
 
@@ -19,9 +23,9 @@ class Strategy(Backtest):
     def teardown(self):
         pass
     
-    def average_true_range(self, DF, n, weighted=False):
+    def average_true_range(self, n, weighted=False):
         "function to calculate True Range and Average True Range"
-        df = DF.copy()
+        df = self.dataframe.copy()
         df['H-L'] = abs(df['High'] - df['Low'])
         df['H-PC'] = abs(df['High'] - df['Adj Close'].shift(1))
         df['L-PC'] = abs(df['Low'] - df['Adj Close'].shift(1))
@@ -34,13 +38,54 @@ class Strategy(Backtest):
         return df2['ATR']
     
     def rolling(self, n=20, weighted=False, dropna=False):
-        df = self.dataframe.copy()
-        self.dataframe["ATR"] = self.average_true_range(self.dataframe, n, weighted=weighted)
+        self.dataframe["ATR"] = self.average_true_range(n, weighted=weighted)
         self.dataframe["roll_max_cp"] = self.dataframe["High"].rolling(n).max()
         self.dataframe["roll_min_cp"] = self.dataframe["Low"].rolling(n).min()
         self.dataframe["roll_max_vol"] = self.dataframe["Volume"].rolling(n).max()
         if dropna is True:
             self.dataframe.dropna(inplace=True)
+
+    def MACD(self, a, b, c):
+        # typical values a = 12; b =26, c =9
+        df = self.dataframe.copy()
+        df["MA_Fast"] = df["Adj Close"].ewm(span=a, min_periods=a).mean()
+        df["MA_Slow"] = df["Adj Close"].ewm(span=b, min_periods=b).mean()
+        df["MACD"] = df["MA_Fast"] - df["MA_Slow"]
+        df["Signal"] = df["MACD"].ewm(span=c, min_periods=c).mean()
+        df.dropna(inplace=True)
+        return (df["MACD"], df["Signal"])
+
+    def slope(self, ser, n):
+        # function to calculate the slope of n consecutive points on a plot
+        slopes = [i * 0 for i in range(n - 1)]
+        for i in range(n, len(ser) + 1):
+            y = ser[i - n:i]
+            x = np.array(range(n))
+            y_scaled = (y - y.min()) / (y.max() - y.min())
+            x_scaled = (x - x.min()) / (x.max() - x.min())
+            x_scaled = sm.add_constant(x_scaled)
+            model = sm.OLS(y_scaled, x_scaled)
+            results = model.fit()
+            slopes.append(results.params[-1])
+        slope_angle = (np.rad2deg(np.arctan(np.array(slopes))))
+        return np.array(slope_angle)
+
+    def renko_bricks(self):
+        df = self.dataframe.copy()
+        df.reset_index(inplace=True)
+        df = df.iloc[:,[0,1,2,3,4,5]]
+        df.columns = ["date", "open", "high", "low", "close", "volume"]
+        df2 = Renko(df)
+        df2.brick_size = max(0.5,round(self.average_true_range(120)[-1], 0))
+        renko_df = df2.get_ohlc_data()
+        renko_df["bar_num"] = np.where(renko_df["uptrend"] == True, 1, np.where(renko_df["uptrend"] == False, -1, 0))
+        for i in range(1, len(renko_df["bar_num"])):
+            if renko_df["bar_num"][i] > 0 and renko_df["bar_num"][i - 1] > 0:
+                renko_df["bar_num"][i] += renko_df["bar_num"][i - 1]
+            elif renko_df["bar_num"][i] < 0 and renko_df["bar_num"][i - 1] < 0:
+                renko_df["bar_num"][i] += renko_df["bar_num"][i - 1]
+        renko_df.drop_duplicates(subset="date", keep="last", inplace=True)
+        return renko_df
 
     def wait_for_signal(self):
         pass
