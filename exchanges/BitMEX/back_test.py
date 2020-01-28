@@ -9,17 +9,19 @@ from strategies.renko_macd import RenkoMACDBackTest
 from exchanges.BitMEX.rest_client import RestClient
 
 
+def import_data(symbol):
+    fp = open('5m_xbtusd_100days.txt', 'r')
+    data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
+    fp.close()
+    df = symbol.data_to_df(data)
+    return df
+
 def renkomacd_backtest(key, secret, product, frequency):
-    def import_data():
-        fp = open('5m_xbtusd_100days.txt', 'r')
-        data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
-        fp.close()
-        df = symbol.data_to_df(data)
-        return df
+
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
     # dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=3)))
-    dataframe = import_data()
+    dataframe = import_data(symbol)
     backtest = RenkoMACDBackTest(dataframe)
     backtest.atr_period = 60
     backtest.slope_period = 3
@@ -38,11 +40,13 @@ def resbrk_backtest(key, secret, product, frequency):
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
     dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=3)))
+    # dataframe = import_data(symbol)
     res_bro = ResistanceBreakoutBackTest(dataframe)
     res_bro.weighted = False
     res_bro.rolling_period = 15
     res_bro.min_profit = 13.5
     res_bro.min_loss = 0
+    res_bro.volume_factor = 1.05
     res_bro.setup()
     res_bro.run()
 
@@ -84,4 +88,4 @@ if __name__ == '__main__':
     secret = params['secret']
     product = params['symbol']
     frequency = '5m'
-    btc = renkomacd_backtest(key, secret, product, frequency)
+    btc = resbrk_backtest(key, secret, product, frequency)

@@ -81,6 +81,117 @@ class RenkoMACDBackTest(SinglePositionBackTest):
         return False
 
 
+class RenkoMACD(SinglePosition):
+    def __init__(self, dataframe, duration='5m'):
+        super(RenkoMACD, self).__init__(dataframe)
+        self.min_profit = 0
+        self.min_loss = 0
+        self.book = {'buy': None, 'sell': None, 'ltp': None}
+        self.atr_period = 120
+        self.slope_period = 5
+        self.macd_array = (12, 26, 9)
+        seconds = {
+            '1m': 60,
+            '3m': 60 * 3,
+            '5m': 60 * 5,
+            '15m': 60 * 15,
+            '1h': 60 * 60 * 1,
+            '4h': 60 * 60 * 4,
+            '1d': 60 * 60 * 24
+        }
+        self.period = seconds[duration]
+        self.logger = logging.getLogger()
+
+    def setup(self):
+        # Merge renko bricks
+        self.update_renko_bricks()
+
+    def update_renko_bricks(self):
+        renko = self.renko_bricks(self.atr_period)
+        renko.columns = ["Date", "open", "high", "low", "close", "uptrend", "bar_num"]
+        df = self.dataframe.copy()
+        df["Date"] = df.index
+        self.dataframe = df.merge(renko.loc[:, ["Date", "bar_num"]], how="outer", on="Date")
+        self.dataframe["bar_num"].fillna(method='ffill', inplace=True)
+        (macd, macd_sig) = self.MACD(*self.macd_array)
+        self.dataframe["macd"] = macd
+        self.dataframe["macd_sig"] = macd_sig
+        self.dataframe["macd_slope"] = self.slope(self.dataframe["macd"], self.slope_period)
+        self.dataframe["macd_sig_slope"] = self.slope(self.dataframe["macd_sig"], self.slope_period)
+
+    def update_book(self):
+        # Override this method and update book info as per your exchange
+        pass
+
+    def update_dataframe(self):
+        # Override this method and update ohlc dataframe info as per your exchange
+        pass
+
+    def before_run(self):
+        # Update Buy/Sell/Ltp book
+        self.update_book()
+
+        last_updated = self.dataframe.index[-1]
+        curr_time = datetime.now(last_updated.tz)
+        seconds = curr_time - last_updated.to_pydatetime()
+        if seconds.total_seconds() >= self.period:
+            # Update candle
+            self.update_dataframe()
+            # Calculate renko bricks
+            self.update_renko_bricks()
+
+    def open_position(self):
+        # Override this method to open a position. Use self.signal for Buy or Sell.
+        # Also update self.position_index value
+        print("Open position")
+
+    def close_price_within_limits(self):
+        multiplier = -1 if self.signal == 'Sell' else 1
+        exit_price = self.book['ltp']
+        net = (exit_price - self.entry_price) * multiplier
+        if (net < 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
+            self.logger.info("CLOSE SATISFIED:\nEntry at: {}, Exit at: {}, Net: {}".format(self.entry_price, exit_price, net))
+            return True
+        return False
+
+    def close_position(self):
+        # Override this method to close open position.
+        # Use close_price_within_limits() to verify close price
+        print("Close position")
+
+    def enter_buy(self):
+        if self.dataframe["bar_num"][-1] >= 2 and self.dataframe["macd"][-1] > self.dataframe["macd_sig"][-1] and \
+                self.dataframe["macd_slope"][-1] > self.dataframe["macd_sig_slope"][-1]:
+            self.logger.info("Enter BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
+            return True
+
+        return False
+
+    def enter_sell(self):
+        if self.dataframe["bar_num"][-1] <= -2 and self.dataframe["macd"][-1] < self.dataframe["macd_sig"][-1] and \
+                self.dataframe["macd_slope"][-1] < self.dataframe["macd_sig_slope"][-1]:
+            self.logger.info("Enter SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
+            return True
+
+        return False
+
+    def exit_buy(self):
+        if self.dataframe["macd"][-1] < self.dataframe["macd_sig"][-1] and \
+                self.dataframe["macd_slope"][-1] < self.dataframe["macd_sig_slope"][-1]:
+            self.logger.info("Exit BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
+            return True
+
+        return False
+
+    def exit_sell(self):
+        if self.dataframe["macd"][-1] > self.dataframe["macd_sig"][-1] and \
+                self.dataframe["macd_slope"][-1] > self.dataframe["macd_sig_slope"][-1]:
+            self.logger.info("Exit SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
+            return True
+
+        return False
+
+
 def study():
     import numpy as np
     import pandas as pd

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from time import sleep
 from exchanges.BitMEX.bitmex_symbol import BitMEXSymbol
 from strategies.res_brkout import ResistanceBreakout
+from strategies.renko_macd import RenkoMACD
 from exchanges.BitMEX.mywebsocket import MyWebSocket
 from exchanges.BitMEX.rest_client import RestClient
 from exchanges.BitMEX.order import Order
@@ -105,8 +106,22 @@ def run_resistance_breakout():
     res_bro.time_bound_run(60 * 60 * 24 * 3)
     return res_bro
 
+def run_renko_macd():
+    renko_macd = RenkoMACD(dataframe)
+    renko_macd.atr_period = 60
+    renko_macd.slope_period = 3
+    renko_macd.macd_array = (6, 15, 6)
+    renko_macd.setup()
+    renko_macd.time_bound_run(60 * 60 * 24 * 3)
+    return renko_macd
+
 
 if __name__ == '__main__':
+    # Needed for printing all coluns of pandas in log file
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
+
     with open("config.json", 'r') as f:
         data = json.load(f)
 

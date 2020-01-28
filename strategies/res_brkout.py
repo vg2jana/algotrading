@@ -11,6 +11,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         self.rolling_period = 20
         self.min_profit = 0
         self.min_loss = 0
+        self.volume_factor = 1.5
     
     def setup(self):
         # Calculate rolling
@@ -37,7 +38,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
     def enter_buy(self):
         i = self.iter
         if self.dataframe["High"][i] >= self.dataframe["roll_max_cp"][i] and \
-                self.dataframe["Volume"][i] > 1.5 * self.dataframe["roll_max_vol"][i - 1]:
+                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
             return True
         
         return False
@@ -45,7 +46,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
     def enter_sell(self):
         i = self.iter
         if self.dataframe["Low"][i] <= self.dataframe["roll_min_cp"][i] and \
-                self.dataframe["Volume"][i] > 1.5 * self.dataframe["roll_max_vol"][i - 1]:
+                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
             return True
         
         return False
@@ -72,6 +73,7 @@ class ResistanceBreakout(SinglePosition):
         self.rolling_period = 20
         self.min_profit = 0
         self.min_loss = 0
+        self.volume_factor = 1.5
         self.book = {'buy': None, 'sell': None, 'ltp': None}
         seconds = {
             '1m': 60,
@@ -133,7 +135,7 @@ class ResistanceBreakout(SinglePosition):
 
     def enter_buy(self):
         if self.dataframe["High"][-1] >= self.dataframe["roll_max_cp"][-1] and \
-                self.dataframe["Volume"][-1] > 1.5 * self.dataframe["roll_max_vol"][-2]:
+                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2]:
             self.logger.info("Enter BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
@@ -141,7 +143,7 @@ class ResistanceBreakout(SinglePosition):
 
     def enter_sell(self):
         if self.dataframe["Low"][-1] <= self.dataframe["roll_min_cp"][-1] and \
-                self.dataframe["Volume"][-1] > 1.5 * self.dataframe["roll_max_vol"][-2]:
+                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2]:
             self.logger.info("Enter SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
