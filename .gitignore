@@ -4,3 +4,5 @@ __pycache__/
 .DS_Store
 *.sqlite3
 *.json
+*.txt
+*.log

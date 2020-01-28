@@ -1,11 +1,11 @@
-import bitmex
 import sqlite3
 import pandas as pd
 import logging
 from indicator.base_symbol import Symbol
 from time import sleep
 from datetime import datetime, timedelta
-from strategies.res_brkout import ResistanceBreakoutBackTest, ResistanceBreakout
+from strategies.res_brkout import ResistanceBreakoutBackTest
+from exchanges.BitMEX.rest_client import RestClient
 
 
 class BitMEXSymbol(Symbol):
@@ -25,10 +25,14 @@ class BitMEXSymbol(Symbol):
         self.logger.info("UPDATE CANDLE:\n{}".format(str(data)))
         return df1
 
-    def fetch_data(self, start_time, count=1000):
+    def fetch_data(self, start_time, end_time=None, count=1000):
         if type(start_time) is not str:
             start_time = start_time.strftime("%Y-%m-%d %H:%M")
         filter = '{"symbol": "%s", "startTime": "%s"}' % (self.symbol, start_time)
+        if end_time is not None:
+            if type(end_time) is not str:
+                end_time = end_time.strftime("%Y-%m-%d %H:%M")
+            filter = '{"symbol": "%s", "startTime": "%s", "endTime": "%s"}' % (self.symbol, start_time, end_time)
         attempts = 5
         data = None
         while attempts > 0:
@@ -67,3 +71,29 @@ if __name__ == '__main__':
         sum = 0
         for r in s.returns:
             sum += r[-1] - 13.5
+
+
+    key = "VvD5-fMBfiZ9dlMtXP2pffHj"
+    secret = "jROi3UZ5q_hkVW2RnK3xbCQEnTzpLXcnbOdUCJTnQFrrdUgj"
+    product = 'XBTUSD'
+    frequency = '5m'
+    client = RestClient(False, key, secret, product)
+    symbol = BitMEXSymbol(product, client=client, frequency=frequency)
+    # now = datetime.utcnow()
+    # data = []
+    # fp = open('5m_xbtusd_100days.txt', 'w')
+    # wanted_ones = ['open', 'close', 'low', 'high', 'volume', 'timestamp']
+    # for i in range(0, 100, 3):
+    #     temp = symbol.fetch_data(datetime.utcnow() - timedelta(days=100 - i), count=864)
+    #     ohlc = []
+    #     for t in temp:
+    #         d = {k: t[k] for k in wanted_ones}
+    #         ohlc.append(str(d))
+    #     sleep(2)
+    #     fp.write('\n'.join(ohlc))
+    #     fp.write('\n')
+    # fp.close()
+    fp = open('5m_xbtusd_100days.txt', 'r')
+    data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
+    fp.close()
+    df = symbol.data_to_df(data)

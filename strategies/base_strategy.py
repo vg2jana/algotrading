@@ -1,5 +1,6 @@
 import numpy as np
 import statsmodels.api as sm
+import pandas as pd
 
 from stocktrends import Renko
 from backtest.backtest import Backtest
@@ -70,21 +71,22 @@ class Strategy(Backtest):
         slope_angle = (np.rad2deg(np.arctan(np.array(slopes))))
         return np.array(slope_angle)
 
-    def renko_bricks(self):
+    def renko_bricks(self, atr_period):
         df = self.dataframe.copy()
         df.reset_index(inplace=True)
-        df = df.iloc[:,[0,1,2,3,4,5]]
+        df = df.iloc[:, [0, 1, 2, 3, 4, 5]]
         df.columns = ["date", "open", "high", "low", "close", "volume"]
         df2 = Renko(df)
-        df2.brick_size = max(0.5,round(self.average_true_range(120)[-1], 0))
+        df2.brick_size = max(0.5, round(self.average_true_range(atr_period)[-1], 0))
         renko_df = df2.get_ohlc_data()
         renko_df["bar_num"] = np.where(renko_df["uptrend"] == True, 1, np.where(renko_df["uptrend"] == False, -1, 0))
         for i in range(1, len(renko_df["bar_num"])):
             if renko_df["bar_num"][i] > 0 and renko_df["bar_num"][i - 1] > 0:
-                renko_df["bar_num"][i] += renko_df["bar_num"][i - 1]
+                renko_df["bar_num"].iloc[i] += renko_df["bar_num"].iloc[i - 1]
             elif renko_df["bar_num"][i] < 0 and renko_df["bar_num"][i - 1] < 0:
-                renko_df["bar_num"][i] += renko_df["bar_num"][i - 1]
+                renko_df["bar_num"].iloc[i] += renko_df["bar_num"].iloc[i - 1]
         renko_df.drop_duplicates(subset="date", keep="last", inplace=True)
+        renko_df["date"] = pd.to_datetime(renko_df["date"])
         return renko_df
 
     def wait_for_signal(self):

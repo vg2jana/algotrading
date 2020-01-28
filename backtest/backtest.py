@@ -1,7 +1,4 @@
 import numpy as np
-import pandas as pd
-from alpha_vantage.timeseries import TimeSeries
-import copy
 
 
 class Backtest:

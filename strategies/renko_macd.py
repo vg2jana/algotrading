@@ -8,8 +8,9 @@ from strategies.base_strategy import SinglePositionBackTest, SinglePosition
 class RenkoMACDBackTest(SinglePositionBackTest):
     def __init__(self, dataframe):
         super(RenkoMACDBackTest, self).__init__(dataframe)
-        self.weighted = False
-        self.rolling_period = 20
+        self.atr_period = 120
+        self.slope_period = 5
+        self.macd_array = (12, 26, 9)
         self.min_profit = 0
         self.min_loss = 0
 
@@ -18,16 +19,16 @@ class RenkoMACDBackTest(SinglePositionBackTest):
         self.update_renko_bricks()
 
     def update_renko_bricks(self):
-        renko = self.renko_bricks()
+        renko = self.renko_bricks(self.atr_period)
         renko.columns = ["Date", "open", "high", "low", "close", "uptrend", "bar_num"]
         df = self.dataframe.copy()
         df["Date"] = df.index
         self.dataframe = df.merge(renko.loc[:, ["Date", "bar_num"]], how="outer", on="Date")
         self.dataframe["bar_num"].fillna(method='ffill', inplace=True)
-        self.dataframe["macd"] = self.MACD(12, 26, 9)[0]
-        self.dataframe["macd_sig"] = self.MACD(12, 26, 9)[1]
-        self.dataframe["macd_slope"] = self.slope(self.dataframe["macd"], 5)
-        self.dataframe["macd_sig_slope"] = self.slope(self.dataframe["macd_sig"], 5)
+        self.dataframe["macd"] = self.MACD(*self.macd_array)[0]
+        self.dataframe["macd_sig"] = self.MACD(*self.macd_array)[1]
+        self.dataframe["macd_slope"] = self.slope(self.dataframe["macd"], self.slope_period)
+        self.dataframe["macd_sig_slope"] = self.slope(self.dataframe["macd_sig"], self.slope_period)
 
     def open_position(self):
         i = self.iter
@@ -37,10 +38,10 @@ class RenkoMACDBackTest(SinglePositionBackTest):
     def close_position(self):
         i = self.iter
         multiplier = -1 if self.signal == 'Sell' else 1
-        exit_price = self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1] * multiplier)
+        exit_price = self.dataframe["Adj Close"][i - 1]
         net = (exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
-            self.exit_price = self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1] * multiplier)
+            self.exit_price = exit_price
             self.exit_index = i
             self.returns.append((self.entry_index, self.exit_index, net))
             return True
