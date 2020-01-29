@@ -17,15 +17,14 @@ def import_data(symbol):
     return df
 
 def renkomacd_backtest(key, secret, product, frequency):
-
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
-    # dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=3)))
+    # dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=1)))
     dataframe = import_data(symbol)
     backtest = RenkoMACDBackTest(dataframe)
-    backtest.atr_period = 60
-    backtest.slope_period = 3
-    backtest.macd_array = (6, 15, 6)
+    # backtest.atr_period = 60
+    # backtest.slope_period = 3
+    # backtest.macd_array = (6, 15, 6)
     backtest.setup()
     backtest.run()
 
@@ -39,25 +38,38 @@ def renkomacd_backtest(key, secret, product, frequency):
 def resbrk_backtest(key, secret, product, frequency):
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
-    dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=3)))
-    # dataframe = import_data(symbol)
+    # dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=3)))
+    dataframe = import_data(symbol)
+    # fp = open('5m_xbtusd_100days.txt', 'r')
+    # data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
+    # fp.close()
+    # dataframe = symbol.fetch_data(datetime.utcnow(), data=data)
     res_bro = ResistanceBreakoutBackTest(dataframe)
     res_bro.weighted = False
     res_bro.rolling_period = 15
     res_bro.min_profit = 13.5
     res_bro.min_loss = 0
-    res_bro.volume_factor = 1.05
+    res_bro.volume_factor = 1
     res_bro.setup()
     res_bro.run()
 
     sum = 0
     trades = []
     time_series = res_bro.dataframe.index.tolist()
+    max_loss = 0
+    max_loss_frame = None
     for r in res_bro.returns:
         sum += r[2] - 13.5
         open_frame = res_bro.dataframe.iloc[r[0]]
+        open_time = time_series[r[0]]
         close_frame = res_bro.dataframe.iloc[r[1]]
-        trades.append((time_series[r[0]], open_frame['Open'], time_series[r[1]], close_frame['Adj Close']))
+        close_time = time_series[r[1]]
+        frame = res_bro.dataframe.iloc[r[0]:r[1]+1]
+        trades.append((open_time, open_frame['Adj Close'], close_time, close_frame['Adj Close'], r[2]))
+        if r[2] < max_loss:
+            max_loss_frame = frame
+            max_loss = r[2]
+
 
     print(sum)
     return res_bro

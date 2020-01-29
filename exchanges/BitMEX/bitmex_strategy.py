@@ -103,6 +103,7 @@ def run_resistance_breakout():
     res_bro.rolling_period = 15
     res_bro.min_profit = 13.5
     res_bro.min_loss = 0
+    res_bro.volume_factor = 1
     res_bro.time_bound_run(60 * 60 * 24 * 3)
     return res_bro
 

@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import logging
+import re
 from indicator.base_symbol import Symbol
 from time import sleep
 from datetime import datetime, timedelta
@@ -25,7 +26,7 @@ class BitMEXSymbol(Symbol):
         self.logger.info("UPDATE CANDLE:\n{}".format(str(data)))
         return df1
 
-    def fetch_data(self, start_time, end_time=None, count=1000):
+    def fetch_data(self, start_time, end_time=None, count=1000, data=None):
         if type(start_time) is not str:
             start_time = start_time.strftime("%Y-%m-%d %H:%M")
         filter = '{"symbol": "%s", "startTime": "%s"}' % (self.symbol, start_time)
@@ -33,14 +34,46 @@ class BitMEXSymbol(Symbol):
             if type(end_time) is not str:
                 end_time = end_time.strftime("%Y-%m-%d %H:%M")
             filter = '{"symbol": "%s", "startTime": "%s", "endTime": "%s"}' % (self.symbol, start_time, end_time)
+
+        bin_size = self.frequency
+        match = re.match("(\d+)(\S)", bin_size)
+        counter, period = match.groups()
+        counter = int(counter)
+        if period == 'm':
+            if counter % 5 == 0:
+                bin_size = '5m'
+                counter = int(counter / 5)
+            else:
+                bin_size = '1m'
+        elif period == 'h':
+            bin_size = '1h'
+        elif period == 'd':
+            bin_size = '1d'
+
         attempts = 5
         data = None
         while attempts > 0:
-            data = self.client.trade_bucket(binSize=self.frequency, count=count, filter=filter)
+            data = self.client.trade_bucket(binSize=bin_size, count=count, filter=filter)
             if data is not None and len(data) > 0:
                 break
             sleep(1)
             attempts -= 1
+        else:
+            return
+
+        if self.frequency not in ('1m', '5m', '1h', '1d'):
+            temp = []
+            for i in range(0, int(len(data) / counter), counter):
+                d = {
+                    'timestamp': data[i]['timestamp'],
+                    'open': data[i]['open'],
+                    'close': data[i + counter - 1]['close'],
+                    'high': max([x['high'] for x in data[i:i+counter]]),
+                    'low': min([x['low'] for x in data[i:i+counter]]),
+                    'volume': sum([x['volume'] for x in data[i:i+counter]])
+                }
+                temp.append(d)
+            data = temp
 
         return self.data_to_df(data)
 

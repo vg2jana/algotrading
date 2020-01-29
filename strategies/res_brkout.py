@@ -19,13 +19,13 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
 
     def open_position(self):
         i = self.iter
-        self.entry_price = self.dataframe["Open"][self.iter]
+        self.entry_price = self.dataframe["Adj Close"][self.iter]
         self.entry_index = i
 
     def close_position(self):
         i = self.iter
         multiplier = -1 if self.signal == 'Sell' else 1
-        exit_price = self.dataframe["Adj Close"][i - 1]
+        exit_price = self.dataframe["Adj Close"][i-1] - (self.dataframe["ATR"][i-1] * multiplier)
         net = (exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
             self.exit_price = self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1] * multiplier)
@@ -53,14 +53,14 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
     
     def exit_buy(self):
         i = self.iter
-        if self.dataframe["Adj Close"][i] < self.dataframe["Adj Close"][i - 1] - self.dataframe["ATR"][i - 1]:
+        if self.dataframe["Adj Close"][i] < self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1]):
             return True
         
         return False
     
     def exit_sell(self):
         i = self.iter
-        if self.dataframe["Adj Close"][i] > self.dataframe["Adj Close"][i - 1] + self.dataframe["ATR"][i - 1]:
+        if self.dataframe["Adj Close"][i] > self.dataframe["Adj Close"][i - 1] + (self.dataframe["ATR"][i - 1]):
             return True
 
         return False
@@ -135,7 +135,8 @@ class ResistanceBreakout(SinglePosition):
 
     def enter_buy(self):
         if self.dataframe["High"][-1] >= self.dataframe["roll_max_cp"][-1] and \
-                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2]:
+                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2] and \
+                self.book['ltp'] - self.dataframe["Adj Close"][-1] > self.dataframe["ATR"][-1]:
             self.logger.info("Enter BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
@@ -143,14 +144,15 @@ class ResistanceBreakout(SinglePosition):
 
     def enter_sell(self):
         if self.dataframe["Low"][-1] <= self.dataframe["roll_min_cp"][-1] and \
-                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2]:
+                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2] and \
+                self.dataframe["Adj Close"][-1] - self.book['ltp'] > self.dataframe["ATR"][-1]:
             self.logger.info("Enter SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
 
         return False
 
     def exit_buy(self):
-        if self.dataframe["Adj Close"][-1] < self.dataframe["Adj Close"][-2] - self.dataframe["ATR"][-2] and \
+        if self.book['ltp'] < self.dataframe["Adj Close"][-1] - self.dataframe["ATR"][-1] and \
                 self.close_price_within_limits() is True:
             self.logger.info("Exit BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True
@@ -158,7 +160,7 @@ class ResistanceBreakout(SinglePosition):
         return False
 
     def exit_sell(self):
-        if self.dataframe["Adj Close"][-1] > self.dataframe["Adj Close"][-2] + self.dataframe["ATR"][-2] and \
+        if self.book['ltp'] > self.dataframe["Adj Close"][-1] + self.dataframe["ATR"][-1] and \
                 self.close_price_within_limits() is True:
             self.logger.info("Exit SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
             return True

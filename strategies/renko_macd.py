@@ -32,16 +32,16 @@ class RenkoMACDBackTest(SinglePositionBackTest):
 
     def open_position(self):
         i = self.iter
-        self.entry_price = self.dataframe["Open"][self.iter]
+        self.entry_price = self.dataframe["Adj Close"][self.iter]
         self.entry_index = i
 
     def close_position(self):
         i = self.iter
         multiplier = -1 if self.signal == 'Sell' else 1
-        exit_price = self.dataframe["Adj Close"][i - 1]
+        exit_price = self.dataframe["Adj Close"][i]
         net = (exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
-            self.exit_price = exit_price
+            self.exit_price = self.dataframe["Adj Close"][i]
             self.exit_index = i
             self.returns.append((self.entry_index, self.exit_index, net))
             return True

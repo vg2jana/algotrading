@@ -173,7 +173,7 @@ class SinglePosition(Strategy):
 
         elif self.signal == 'Buy':
             enter_sell = self.enter_sell()
-            if self.exit_buy() is True or (enter_sell is True and self.close_price_within_limits() is True):
+            if self.exit_buy() is True or enter_sell is True:
                 self.close_position()
                 self.signal = None
             if enter_sell is True:
@@ -183,7 +183,7 @@ class SinglePosition(Strategy):
 
         elif self.signal == 'Sell':
             enter_buy = self.enter_buy()
-            if self.exit_sell() is True or (enter_buy is True and self.close_price_within_limits() is True):
+            if self.exit_sell() is True or enter_buy is True:
                 self.close_position()
                 self.signal = None
             if enter_buy is True:
@@ -191,7 +191,7 @@ class SinglePosition(Strategy):
                 if self.open_position() is not True:
                     self.signal = None
 
-        self.last_frame = len(self.dataframe)
+        # self.last_frame = len(self.dataframe)
 
     def time_bound_run(self, seconds):
         start_time = datetime.now()
@@ -203,8 +203,8 @@ class SinglePosition(Strategy):
         # Being run
         while lapsed_seconds <= seconds:
             self.before_run()
-            if len(self.dataframe) > self.last_frame:
-                self.run()
+            # if len(self.dataframe) > self.last_frame:
+            self.run()
             self.after_run()
             curr_time = datetime.now()
             lapsed_seconds = curr_time - start_time
