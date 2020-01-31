@@ -43,6 +43,7 @@ class Strategy(Backtest):
         self.dataframe["roll_max_cp"] = self.dataframe["High"].rolling(n).max()
         self.dataframe["roll_min_cp"] = self.dataframe["Low"].rolling(n).min()
         self.dataframe["roll_max_vol"] = self.dataframe["Volume"].rolling(n).max()
+        self.dataframe["rsi"] = self.RSI().copy()
         if dropna is True:
             self.dataframe.dropna(inplace=True)
 
@@ -89,6 +90,35 @@ class Strategy(Backtest):
         renko_df["date"] = pd.to_datetime(renko_df["date"])
         return renko_df
 
+    def RSI(self, DF=None, n=14):
+        "function to calculate RSI"
+        if DF is None:
+            df = self.dataframe.copy()
+        else:
+            df = DF.copy()
+        df['delta'] = df['Adj Close'] - df['Adj Close'].shift(1)
+        df['gain'] = np.where(df['delta'] >= 0, df['delta'], 0)
+        df['loss'] = np.where(df['delta'] < 0, abs(df['delta']), 0)
+        avg_gain = []
+        avg_loss = []
+        gain = df['gain'].tolist()
+        loss = df['loss'].tolist()
+        for i in range(len(df)):
+            if i < n:
+                avg_gain.append(np.NaN)
+                avg_loss.append(np.NaN)
+            elif i == n:
+                avg_gain.append(df['gain'].rolling(n).mean().tolist()[n])
+                avg_loss.append(df['loss'].rolling(n).mean().tolist()[n])
+            elif i > n:
+                avg_gain.append(((n - 1) * avg_gain[i - 1] + gain[i]) / n)
+                avg_loss.append(((n - 1) * avg_loss[i - 1] + loss[i]) / n)
+        df['avg_gain'] = np.array(avg_gain)
+        df['avg_loss'] = np.array(avg_loss)
+        df['RS'] = df['avg_gain'] / df['avg_loss']
+        df['RSI'] = 100 - (100 / (1 + df['RS']))
+        return df['RSI']
+
     def wait_for_signal(self):
         pass
 
@@ -118,6 +148,12 @@ class SinglePositionBackTest(Strategy):
     def __init__(self, dataframe):
         super(SinglePositionBackTest, self).__init__(dataframe)
 
+    def before_run(self):
+        pass
+
+    def after_run(self):
+        pass
+
     def wait_for_signal(self):
         if self.enter_buy() is True:
             self.signal = 'Buy'
@@ -127,6 +163,7 @@ class SinglePositionBackTest(Strategy):
     def run(self):
         for i in range(len(self.dataframe)):
             self.iter = i
+            self.before_run()
 
             if self.signal is None:
                 self.wait_for_signal()
@@ -142,6 +179,8 @@ class SinglePositionBackTest(Strategy):
                 if self.exit_sell() is True or self.enter_buy() is True:
                     if self.close_position() is True:
                         self.signal = None
+
+            self.after_run()
 
 
 class SinglePosition(Strategy):

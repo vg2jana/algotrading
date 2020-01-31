@@ -43,7 +43,7 @@ class RenkoMACDBackTest(SinglePositionBackTest):
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
             self.exit_price = self.dataframe["Adj Close"][i]
             self.exit_index = i
-            self.returns.append((self.entry_index, self.exit_index, net))
+            self.returns.append((self.entry_index, self.exit_index, net, self.entry_price, exit_price, self.signal))
             return True
 
         return False

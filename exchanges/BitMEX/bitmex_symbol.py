@@ -26,7 +26,7 @@ class BitMEXSymbol(Symbol):
         self.logger.info("UPDATE CANDLE:\n{}".format(str(data)))
         return df1
 
-    def fetch_data(self, start_time, end_time=None, count=1000, data=None):
+    def fetch_data(self, start_time, end_time=None, count=1000, data=None, frequency=None):
         if type(start_time) is not str:
             start_time = start_time.strftime("%Y-%m-%d %H:%M")
         filter = '{"symbol": "%s", "startTime": "%s"}' % (self.symbol, start_time)
@@ -35,7 +35,9 @@ class BitMEXSymbol(Symbol):
                 end_time = end_time.strftime("%Y-%m-%d %H:%M")
             filter = '{"symbol": "%s", "startTime": "%s", "endTime": "%s"}' % (self.symbol, start_time, end_time)
 
-        bin_size = self.frequency
+        if frequency is None:
+            frequency = self.frequency
+        bin_size = frequency
         match = re.match("(\d+)(\S)", bin_size)
         counter, period = match.groups()
         counter = int(counter)
@@ -51,19 +53,21 @@ class BitMEXSymbol(Symbol):
             bin_size = '1d'
 
         attempts = 5
-        data = None
-        while attempts > 0:
-            data = self.client.trade_bucket(binSize=bin_size, count=count, filter=filter)
-            if data is not None and len(data) > 0:
-                break
-            sleep(1)
-            attempts -= 1
-        else:
-            return
+        if data is None:
+            while attempts > 0:
+                data = self.client.trade_bucket(binSize=bin_size, count=count, filter=filter)
+                if data is not None and len(data) > 0:
+                    break
+                sleep(1)
+                attempts -= 1
+            else:
+                return
 
-        if self.frequency not in ('1m', '5m', '1h', '1d'):
+        if frequency not in ('1m', '5m', '1h', '1d'):
             temp = []
-            for i in range(0, int(len(data) / counter), counter):
+            for i in range(0, len(data), counter):
+                if i + counter > len(data):
+                    break
                 d = {
                     'timestamp': data[i]['timestamp'],
                     'open': data[i]['open'],
@@ -114,7 +118,7 @@ if __name__ == '__main__':
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
     # now = datetime.utcnow()
     # data = []
-    # fp = open('5m_xbtusd_100days.txt', 'w')
+    # fp = open('XBTUSD_5m_100days.txt', 'w')
     # wanted_ones = ['open', 'close', 'low', 'high', 'volume', 'timestamp']
     # for i in range(0, 100, 3):
     #     temp = symbol.fetch_data(datetime.utcnow() - timedelta(days=100 - i), count=864)
@@ -126,7 +130,7 @@ if __name__ == '__main__':
     #     fp.write('\n'.join(ohlc))
     #     fp.write('\n')
     # fp.close()
-    fp = open('5m_xbtusd_100days.txt', 'r')
+    fp = open('XBTUSD_5m_100days.txt', 'r')
     data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
     fp.close()
     df = symbol.data_to_df(data)
