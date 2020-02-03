@@ -65,10 +65,11 @@ def resbrk_backtest(key, secret, product, frequency):
     dataframe = symbol.fetch_data(datetime.utcnow(), data=data)
     res_bro = ResistanceBreakoutBackTest(dataframe)
     # res_bro.weighted = False
-    res_bro.rolling_period = 40
-    res_bro.min_profit = 15
-    res_bro.min_loss = -75
-    res_bro.volume_factor = 3.5
+    res_bro.rolling_period = 30
+    res_bro.min_profit = 100
+    res_bro.min_loss = -300
+    res_bro.max_loss = -300
+    res_bro.volume_factor = 0.5
     res_bro.setup()
     res_bro.run()
 
@@ -96,27 +97,27 @@ def resbrk_backtest(key, secret, product, frequency):
     print(sum)
     return res_bro
 
-def resbrk_parentchild(key, secret, product, frequency, child_frequency='5m'):
+def resbrk_parentchild(key, secret, product, frequency, child_frequency='1m'):
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
 
-    fp = open('XBTUSD_1h_365days.txt', 'r')
+    fp = open('XBTUSD_5m_100days.txt', 'r')
     data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
     fp.close()
     parent_dataframe = symbol.fetch_data(datetime.utcnow(), data=data, frequency=frequency)
 
-    fp = open('XBTUSD_5m_100days.txt', 'r')
+    fp = open('XBTUSD_1m_100days.txt', 'r')
     data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
     fp.close()
     child_dataframe = symbol.fetch_data(datetime.utcnow(), data=data, frequency=child_frequency)
 
     # parent_dataframe = import_data(symbol, "XBTUSD_1h_365days.txt")
-    bt = ResistanceBreakoutParentChildBackTest(parent_dataframe.iloc[-1 * 24 * 90:], child_dataframe, frequency, child_frequency=child_frequency)
+    bt = ResistanceBreakoutParentChildBackTest(parent_dataframe.iloc[-1 * 6 * 24 * 90:], child_dataframe, frequency, child_frequency=child_frequency)
     bt.rolling_period = 30
     bt.min_profit = 100
-    bt.min_loss = -150
-    bt.volume_factor = 1
-    bt.max_loss = -150
+    bt.min_loss = -300
+    bt.volume_factor = 0.1
+    bt.max_loss = -300
     bt.setup()
     bt.run()
 
@@ -192,5 +193,5 @@ if __name__ == '__main__':
     key = params['key']
     secret = params['secret']
     product = params['symbol']
-    frequency = '1h'
+    frequency = '10m'
     btc = resbrk_parentchild(key, secret, product, frequency)

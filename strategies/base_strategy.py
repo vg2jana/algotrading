@@ -137,7 +137,7 @@ class Strategy(Backtest):
     def open_position(self):
         pass
 
-    def close_position(self):
+    def close_position(self, force=False):
         pass
 
     def run(self):
@@ -171,13 +171,13 @@ class SinglePositionBackTest(Strategy):
                     self.open_position()
 
             elif self.signal == 'Buy':
-                if self.exit_buy() is True or self.enter_sell() is True:
-                    if self.close_position() is True:
+                if (self.exit_buy() is True and self.close_position() is True) or \
+                        (self.enter_sell() and self.close_position(force=True) is True):
                         self.signal = None
 
             elif self.signal == 'Sell':
-                if self.exit_sell() is True or self.enter_buy() is True:
-                    if self.close_position() is True:
+                if (self.exit_sell() is True and self.close_position() is True) or \
+                        (self.enter_buy() is True and self.close_position(force=True) is True):
                         self.signal = None
 
             self.after_run()

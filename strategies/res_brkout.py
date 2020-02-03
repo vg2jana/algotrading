@@ -27,6 +27,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         self.rolling_period = 20
         self.min_profit = 0
         self.min_loss = 0
+        self.max_loss = None
         self.volume_factor = 1.5
     
     def setup(self):
@@ -38,12 +39,34 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         self.entry_price = self.dataframe["Adj Close"][i]
         self.entry_index = i
 
-    def close_position(self):
+    def after_run(self):
+        i = self.iter
+        close = False
+        # Check for max loss
+        if self.signal is 'Buy':
+            multiplier = 1
+            if self.max_loss is not None and self.dataframe["Adj Close"][i] - self.entry_price < self.max_loss:
+                self.exit_price = self.entry_price + self.max_loss
+                close = True
+        elif self.signal is 'Sell':
+            multiplier = -1
+            if self.max_loss is not None and self.entry_price - self.dataframe["Adj Close"][i] < self.max_loss:
+                self.exit_price = self.entry_price - self.max_loss
+                close = True
+
+        if close is True:
+            self.exit_index = i
+            net = max(self.max_loss, (self.exit_price - self.entry_price) * multiplier)
+            self.returns.append(
+                (self.entry_index, self.exit_index, net, self.entry_price, self.exit_price, self.signal))
+            self.signal = None
+
+    def close_position(self, force=False):
         i = self.iter
         multiplier = -1 if self.signal == 'Sell' else 1
         self.exit_price = self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1] * multiplier)
         net = (self.exit_price - self.entry_price) * multiplier
-        if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
+        if force is True or (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
             self.exit_index = i
             self.returns.append((self.entry_index, self.exit_index, net, self.entry_price, self.exit_price, self.signal))
             return True
@@ -61,8 +84,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
     def enter_sell(self):
         i = self.iter
         if self.dataframe["Low"][i] <= self.dataframe["roll_min_cp"][i] and \
-                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1] and \
-                self.dataframe['rsi'][i - 1] - self.dataframe['rsi'][i] > 4:
+                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
             return True
         
         return False
@@ -71,12 +93,19 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         i = self.iter
         if self.dataframe["Adj Close"][i] < self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1]):
             return True
+
+
         
         return False
     
     def exit_sell(self):
         i = self.iter
         if self.dataframe["Adj Close"][i] > self.dataframe["Adj Close"][i - 1] + (self.dataframe["ATR"][i - 1]):
+            return True
+
+        # Check for max loss
+        if self.max_loss is not None and self.entry_price - self.dataframe["Adj Close"][i] < self.max_loss:
+            self.exit_price = self.dataframe["Adj Close"][i]
             return True
 
         return False
@@ -231,7 +260,7 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
     def open_position(self):
         self.best_price = self.entry_price
 
-    def close_position(self):
+    def close_position(self, force=False):
         multiplier = -1 if self.signal == 'Sell' else 1
         net = (self.exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
