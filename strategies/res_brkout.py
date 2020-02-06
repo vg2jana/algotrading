@@ -29,6 +29,7 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         self.min_loss = 0
         self.max_loss = None
         self.volume_factor = 1.5
+        self.best_price = 0
     
     def setup(self):
         # Calculate rolling
@@ -38,28 +39,56 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         i = self.iter
         self.entry_price = self.dataframe["Adj Close"][i]
         self.entry_index = i
+        self.best_price = 0
 
     def after_run(self):
         i = self.iter
+        if self.entry_index == i:
+            return
         close = False
+        force = False
         # Check for max loss
         if self.signal is 'Buy':
             multiplier = 1
-            if self.max_loss is not None and self.dataframe["Adj Close"][i] - self.entry_price < self.max_loss:
+            # Exit if low is below best price by 2
+            if self.best_price > 0 and self.dataframe["Low"][i] <= self.entry_price + (self.best_price - self.entry_price) / 2:
+                self.exit_price = self.entry_price + (self.best_price - self.entry_price) / 2
+                close = True
+                force = True
+
+            # Set best price if exceeding minimum profit
+            elif self.dataframe["High"][i] >= self.entry_price + self.min_profit:
+                self.best_price = self.dataframe["High"][i]
+
+            # If price below max loss then exit
+            if self.max_loss is not None and self.dataframe["Low"][i] - self.entry_price < self.max_loss:
                 self.exit_price = self.entry_price + self.max_loss
                 close = True
+
         elif self.signal is 'Sell':
             multiplier = -1
-            if self.max_loss is not None and self.entry_price - self.dataframe["Adj Close"][i] < self.max_loss:
+            # Exit if high is above best price by 2
+            if self.best_price > 0 and self.dataframe["High"][i] >= self.entry_price - (self.entry_price - self.best_price) / 2:
+                self.exit_price = self.entry_price - (self.entry_price - self.best_price) / 2
+                close = True
+                force = True
+
+            # Set best price if exceeding minimum profit
+            elif self.dataframe["Low"][i] <= self.entry_price - self.min_profit:
+                self.best_price = self.dataframe["Low"][i]
+
+            # If price below max loss then exit
+            if self.max_loss is not None and self.entry_price - self.dataframe["High"][i] < self.max_loss:
                 self.exit_price = self.entry_price - self.max_loss
                 close = True
 
         if close is True:
             self.exit_index = i
-            net = max(self.max_loss, (self.exit_price - self.entry_price) * multiplier)
-            self.returns.append(
-                (self.entry_index, self.exit_index, net, self.entry_price, self.exit_price, self.signal))
-            self.signal = None
+            net = (self.exit_price - self.entry_price) * multiplier
+            if force is True or (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
+                self.returns.append(
+                    (self.entry_index, self.exit_index, net, self.entry_price, self.exit_price, self.signal))
+                self.signal = None
 
     def close_position(self, force=False):
         i = self.iter
@@ -75,16 +104,14 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
 
     def enter_buy(self):
         i = self.iter
-        if self.dataframe["High"][i] >= self.dataframe["roll_max_cp"][i] and \
-                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
+        if self.dataframe["High"][i] >= self.dataframe["roll_max_cp"][i] and self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
             return True
         
         return False
 
     def enter_sell(self):
         i = self.iter
-        if self.dataframe["Low"][i] <= self.dataframe["roll_min_cp"][i] and \
-                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
+        if self.dataframe["Low"][i] <= self.dataframe["roll_min_cp"][i] and self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
             return True
         
         return False
@@ -94,18 +121,11 @@ class ResistanceBreakoutBackTest(SinglePositionBackTest):
         if self.dataframe["Adj Close"][i] < self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1]):
             return True
 
-
-        
         return False
     
     def exit_sell(self):
         i = self.iter
         if self.dataframe["Adj Close"][i] > self.dataframe["Adj Close"][i - 1] + (self.dataframe["ATR"][i - 1]):
-            return True
-
-        # Check for max loss
-        if self.max_loss is not None and self.entry_price - self.dataframe["Adj Close"][i] < self.max_loss:
-            self.exit_price = self.dataframe["Adj Close"][i]
             return True
 
         return False
@@ -226,6 +246,8 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
         self.child_period = seconds(child_frequency)
         self.logger = logging.getLogger()
         self.max_loss = -500
+        self.open_price = None
+        self.force_close_position = False
 
     def setup(self):
         # Calculate rolling
@@ -233,38 +255,60 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
 
     def before_run(self):
         # self.child_dataframe["rsi"] = self.RSI(DF=self.child_dataframe)
-        k = self.iter
-        # Get the child frames between the current parent candle and the next
-        prev_index = self.dataframe.index[k] - timedelta(seconds=(self.parent_period))
-        start_index = prev_index + timedelta(seconds=1)
-        end_index = prev_index + timedelta(seconds=(self.parent_period / self.child_period) * self.child_period - 1)
-        frames = self.child_dataframe[start_index:end_index].copy()
-
-        # Calculate ohlcv for child candles
-        self.child_ohlcv = []
-        data = {}
-        for i in range(len(frames)):
-            data = {
-                "Open": frames['Open'].iloc[i],
-                "High": max(frames['High'].iloc[0:i+1]),
-                "Low": min(frames['Low'].iloc[0:i+1]),
-                "Volume": sum(frames['Volume'].iloc[0:i+1]),
-                "Adj Close": frames['Adj Close'].iloc[i],
-            }
-            # if i == 0:
-            #     data['RSI Diff'] = frames['rsi'].iloc[i] - self.dataframe['rsi'].iloc[k-1]
-            # else:
-            #     data['RSI Diff'] = frames['rsi'].iloc[i] - frames['rsi'].iloc[i-1]
-            # self.child_ohlcv.append(data)
+        # k = self.iter
+        # # Get the child frames between the current parent candle and the next
+        # prev_index = self.dataframe.index[k] - timedelta(seconds=(self.parent_period))
+        # start_index = prev_index + timedelta(seconds=1)
+        # end_index = prev_index + timedelta(seconds=(self.parent_period / self.child_period) * self.child_period - 1)
+        # frames = self.child_dataframe[start_index:end_index].copy()
+        #
+        # # Calculate ohlcv for child candles
+        # self.child_ohlcv = []
+        # data = {}
+        # for i in range(len(frames)):
+        #     data = {
+        #         "Open": frames['Open'].iloc[i],
+        #         "High": max(frames['High'].iloc[0:i+1]),
+        #         "Low": min(frames['Low'].iloc[0:i+1]),
+        #         "Volume": sum(frames['Volume'].iloc[0:i+1]),
+        #         "Adj Close": frames['Adj Close'].iloc[i],
+        #         # "rsi": frames['rsi'].iloc[i]
+        #     }
+        #     # if i == 0:
+        #     #     data['RSI Diff'] = frames['rsi'].iloc[i] - self.dataframe['rsi'].iloc[k-1]
+        #     # else:
+        #     #     data['RSI Diff'] = frames['rsi'].iloc[i] - frames['rsi'].iloc[i-1]
+        #     # self.child_ohlcv.append(data)
+        pass
 
     def open_position(self):
+        self.entry_price = self.open_price
+        self.entry_index = self.iter
         self.best_price = self.entry_price
+        self.open_price = None
 
-    def close_position(self, force=False):
+    def is_profitable(self, exit_price):
+        if self.entry_price is None:
+            return True
+
         multiplier = -1 if self.signal == 'Sell' else 1
-        net = (self.exit_price - self.entry_price) * multiplier
+        net = (exit_price - self.entry_price) * multiplier
         if (net <= 0 and net <= self.min_loss) or (net > 0 and net >= self.min_profit):
-            self.returns.append((self.signal, self.entry_price, self.exit_price, net, self.best_price))
+            return True
+
+        return False
+
+    def close_position(self):
+        if self.exit_price is None:
+            self.exit_price = self.open_price
+        if self.is_profitable(self.exit_price) is True or self.force_close_position is True:
+            multiplier = -1 if self.signal == 'Sell' else 1
+            net = (self.exit_price - self.entry_price) * multiplier
+            self.returns.append((self.signal, self.entry_price, self.exit_price, net, self.best_price, self.entry_index, self.iter))
+            self.entry_price = None
+            self.exit_price = None
+            self.best_price = None
+            self.force_close_position = False
             return True
 
         return False
@@ -274,13 +318,15 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
 
         for d in self.child_ohlcv:
             if d["High"] >= self.dataframe["roll_max_cp"][i] and \
-                    d["Volume"] > self.volume_factor * self.dataframe["roll_max_vol"][i]:
-                self.entry_price = d["Adj Close"]
+                    d["Volume"] > self.volume_factor * self.dataframe["roll_max_vol"][i] and \
+                    self.is_profitable(d["Adj Close"]) is True:# and d["rsi"] > 61:
+                self.open_price = d["Adj Close"]
                 return True
 
         if self.dataframe["High"][i] >= self.dataframe["roll_max_cp"][i] and \
-                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
-            self.entry_price = self.dataframe["Adj Close"][i]
+                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1] and \
+                self.is_profitable(self.dataframe["Adj Close"][i]) is True:# and self.dataframe["rsi"][i] > 61:
+            self.open_price = self.dataframe["Adj Close"][i]
             return True
 
         return False
@@ -290,13 +336,15 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
 
         for d in self.child_ohlcv:
             if d["Low"] <= self.dataframe["roll_min_cp"][i] and \
-                    d["Volume"] > self.volume_factor * self.dataframe["roll_max_vol"][i]:
-                self.entry_price = d["Adj Close"]
+                    d["Volume"] > self.volume_factor * self.dataframe["roll_max_vol"][i] and \
+                    self.is_profitable(d["Adj Close"]) is True:# and d["rsi"] < 39:
+                self.open_price = d["Adj Close"]
                 return True
 
         if self.dataframe["Low"][i] <= self.dataframe["roll_min_cp"][i] and \
-                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1]:
-            self.entry_price = self.dataframe["Adj Close"][i]
+                self.dataframe["Volume"][i] > self.volume_factor * self.dataframe["roll_max_vol"][i - 1] and \
+                self.is_profitable(self.dataframe["Adj Close"][i]) is True:# and self.dataframe["rsi"][i] < 39:
+            self.open_price = self.dataframe["Adj Close"][i]
             return True
 
         return False
@@ -307,27 +355,36 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
         for d in self.child_ohlcv:
             if d["High"] > self.best_price:
                 self.best_price = d["High"]
-            elif d["Adj Close"] <= self.entry_price + ((self.best_price - self.entry_price) / 2):
-                self.exit_price = d["Adj Close"]
-                return True
-            if d["Adj Close"] < self.dataframe["Adj Close"][i] - (self.dataframe["ATR"][i]):
-                self.exit_price = d["Adj Close"]
-                return True
-            if d["Adj Close"] - self.entry_price <= self.max_loss:
-                self.exit_price = d["Adj Close"]
+            elif self.best_price >= self.entry_price + self.min_profit and \
+                    d["Low"] <= self.entry_price + ((self.best_price - self.entry_price) / 2):
+                self.exit_price = self.entry_price + ((self.best_price - self.entry_price) / 2)
+                self.force_close_position = True
                 return True
 
-        if self.dataframe["Adj Close"][i] < self.dataframe["Adj Close"][i - 1] - (self.dataframe["ATR"][i - 1]):
-            self.exit_price = self.dataframe["Adj Close"][i]
-            return True
+            diff = self.dataframe["Adj Close"][i] - self.dataframe["ATR"][i]
+            if d["Adj Close"] < diff and self.is_profitable(diff) is True:
+                self.exit_price = diff
+                return True
+
+            if d["Adj Close"] - self.entry_price <= self.max_loss:
+                self.exit_price = self.entry_price + self.max_loss
+                return True
 
         if self.dataframe["High"][i] > self.best_price:
             self.best_price = self.dataframe["High"][i]
-        elif self.dataframe["Adj Close"][i] <= self.entry_price + ((self.best_price - self.entry_price) / 2):
-            self.exit_price = self.dataframe["Adj Close"][i]
+        elif self.best_price >= self.entry_price + self.min_profit and \
+                self.dataframe["Low"][i] <= self.entry_price + ((self.best_price - self.entry_price) / 2):
+            self.exit_price = self.entry_price + ((self.best_price - self.entry_price) / 2)
+            self.force_close_position = True
             return True
+
+        diff = self.dataframe["Adj Close"][i - 1] - self.dataframe["ATR"][i - 1]
+        if self.dataframe["Adj Close"][i] < diff and self.is_profitable(diff) is True:
+            self.exit_price = diff
+            return True
+
         if self.dataframe["Adj Close"][i] - self.entry_price <= self.max_loss:
-            self.exit_price = self.dataframe["Adj Close"][i]
+            self.exit_price = self.entry_price + self.max_loss
             return True
 
         return False
@@ -338,27 +395,36 @@ class ResistanceBreakoutParentChildBackTest(SinglePositionBackTest):
         for d in self.child_ohlcv:
             if d["Low"] < self.best_price:
                 self.best_price = d["Low"]
-            elif d["Adj Close"] >= self.entry_price - ((self.entry_price - self.best_price) / 2):
-                self.exit_price = d["Adj Close"]
-                return True
-            if d["Adj Close"] > self.dataframe["Adj Close"][i] + (self.dataframe["ATR"][i]):
-                self.exit_price = d["Adj Close"]
-                return True
-            if self.entry_price - d["Adj Close"] <= self.max_loss:
-                self.exit_price = d["Adj Close"]
+            elif self.best_price <= self.entry_price - self.min_profit and \
+                    d["High"] >= self.entry_price - ((self.entry_price - self.best_price) / 2):
+                self.exit_price = self.entry_price - ((self.entry_price - self.best_price) / 2)
+                self.force_close_position = True
                 return True
 
-        if self.dataframe["Adj Close"][i] > self.dataframe["Adj Close"][i - 1] + (self.dataframe["ATR"][i - 1]):
-            self.exit_price = self.dataframe["Adj Close"][i]
-            return True
+            diff = self.dataframe["Adj Close"][i] + (self.dataframe["ATR"][i])
+            if d["Adj Close"] > diff and self.is_profitable(diff) is True:
+                self.exit_price = diff
+                return True
+
+            if self.entry_price - d["Adj Close"] <= self.max_loss:
+                self.exit_price = self.entry_price - self.max_loss
+                return True
 
         if self.dataframe["Low"][i] < self.best_price:
             self.best_price = self.dataframe["Low"][i]
-        elif self.dataframe["Adj Close"][i] >= self.entry_price - ((self.entry_price - self.best_price) / 2):
-            self.exit_price = self.dataframe["Adj Close"][i]
+        elif self.best_price <= self.entry_price - self.min_profit and \
+                self.dataframe["High"][i] >= self.entry_price - ((self.entry_price - self.best_price) / 2):
+            self.exit_price = self.entry_price - ((self.entry_price - self.best_price) / 2)
+            self.force_close_position = True
             return True
+
+        diff = self.dataframe["Adj Close"][i - 1] + (self.dataframe["ATR"][i - 1])
+        if self.dataframe["Adj Close"][i] > diff and self.is_profitable(diff) is True:
+            self.exit_price = diff
+            return True
+
         if self.entry_price - self.dataframe["Adj Close"][i] <= self.max_loss:
-            self.exit_price = self.dataframe["Adj Close"][i]
+            self.exit_price = self.entry_price - self.max_loss
             return True
 
         return False

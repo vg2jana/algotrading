@@ -24,9 +24,10 @@ class Strategy(Backtest):
     def teardown(self):
         pass
     
-    def average_true_range(self, n, weighted=False):
+    def average_true_range(self, n, weighted=False, df=None):
         "function to calculate True Range and Average True Range"
-        df = self.dataframe.copy()
+        if df is None:
+            df = self.dataframe.copy()
         df['H-L'] = abs(df['High'] - df['Low'])
         df['H-PC'] = abs(df['High'] - df['Adj Close'].shift(1))
         df['L-PC'] = abs(df['Low'] - df['Adj Close'].shift(1))
@@ -38,14 +39,16 @@ class Strategy(Backtest):
         df2 = df.drop(['H-L', 'H-PC', 'L-PC'], axis=1)
         return df2['ATR']
     
-    def rolling(self, n=20, weighted=False, dropna=False):
-        self.dataframe["ATR"] = self.average_true_range(n, weighted=weighted)
-        self.dataframe["roll_max_cp"] = self.dataframe["High"].rolling(n).max()
-        self.dataframe["roll_min_cp"] = self.dataframe["Low"].rolling(n).min()
-        self.dataframe["roll_max_vol"] = self.dataframe["Volume"].rolling(n).max()
-        self.dataframe["rsi"] = self.RSI().copy()
+    def rolling(self, n=20, weighted=False, dropna=False, df=None):
+        if df is None:
+            df = self.dataframe
+        df["ATR"] = self.average_true_range(n, weighted=weighted, df=df)
+        df["roll_max_cp"] = df["High"].rolling(n).max()
+        df["roll_min_cp"] = df["Low"].rolling(n).min()
+        df["roll_max_vol"] = df["Volume"].rolling(n).max()
+        df["rsi"] = self.RSI(DF=df).copy()
         if dropna is True:
-            self.dataframe.dropna(inplace=True)
+            df.dropna(inplace=True)
 
     def MACD(self, a, b, c):
         # typical values a = 12; b =26, c =9
@@ -137,7 +140,7 @@ class Strategy(Backtest):
     def open_position(self):
         pass
 
-    def close_position(self, force=False):
+    def close_position(self):
         pass
 
     def run(self):
@@ -171,14 +174,26 @@ class SinglePositionBackTest(Strategy):
                     self.open_position()
 
             elif self.signal == 'Buy':
-                if (self.exit_buy() is True and self.close_position() is True) or \
-                        (self.enter_sell() and self.close_position(force=True) is True):
+
+                if self.exit_buy() is True:
+                    if self.close_position() is True:
                         self.signal = None
 
+                elif self.enter_sell() is True:
+                    if self.close_position() is True:
+                        self.signal = 'Sell'
+                        self.open_position()
+
             elif self.signal == 'Sell':
-                if (self.exit_sell() is True and self.close_position() is True) or \
-                        (self.enter_buy() is True and self.close_position(force=True) is True):
+
+                if self.exit_sell() is True:
+                    if self.close_position() is True:
                         self.signal = None
+
+                elif self.enter_buy() is True:
+                    if self.close_position() is True:
+                        self.signal = 'Buy'
+                        self.open_position()
 
             self.after_run()
 
