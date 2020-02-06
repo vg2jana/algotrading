@@ -22,7 +22,7 @@ def renkomacd_backtest(key, secret, product, frequency):
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
     # dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=365)))
     dataframe = import_data(symbol, 'XBTUSD_5m_100days.txt')
-    backtest = RenkoMACDBackTest(dataframe.iloc[-1 * 6 * 24 * 90:])
+    backtest = RenkoMACDBackTest(dataframe.iloc[-1 * 24 * 30:])
     # backtest.atr_period = 60
     # backtest.slope_period = 3
     # backtest.macd_array = (6, 15, 6)
@@ -59,17 +59,16 @@ def resbrk_backtest(key, secret, product, frequency):
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
     # dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=3)))
     # dataframe = import_data(symbol, 'XBTUSD_1h_365days.txt')
-    fp = open('XBTUSD_5m_100days.txt', 'r')
+    fp = open('XBTUSD_1h_365days.txt', 'r')
     data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
     fp.close()
     dataframe = symbol.fetch_data(datetime.utcnow(), data=data, frequency=frequency)
-    res_bro = ResistanceBreakoutBackTest(dataframe)
-    # res_bro.weighted = False
-    res_bro.rolling_period = 30
-    res_bro.min_profit = 100
-    res_bro.min_loss = -300
-    res_bro.max_loss = -300
-    res_bro.volume_factor = 1.5
+    res_bro = ResistanceBreakoutBackTest(dataframe.iloc[-1 * 24 * 360:])
+    res_bro.rolling_period = 15
+    # res_bro.min_profit = 50
+    # res_bro.min_loss = -100
+    # res_bro.max_loss = -150
+    res_bro.volume_factor = 0.1
     res_bro.setup()
     res_bro.run()
 
@@ -80,24 +79,26 @@ def resbrk_backtest(key, secret, product, frequency):
     max_loss_frame = None
     loss_frames = []
     for r in res_bro.returns:
-        sum += max(res_bro.max_loss, r[2]) - 14.5
-        open_frame = res_bro.dataframe.iloc[r[0]]
-        open_time = time_series[r[0]]
-        close_frame = res_bro.dataframe.iloc[r[1]]
-        close_time = time_series[r[1]]
-        frame = res_bro.dataframe.iloc[r[0]:r[1]+1]
-        trades.append((open_time, open_frame['Adj Close'], close_time, close_frame['Adj Close'], r[2]))
-        if r[2] < max_loss:
+        signal, entry_p, exit_p, net, best_price, oi, ci = r
+        max_loss = int(entry_p / 150) * -3
+        sum += max(max_loss, net) - 14.5
+        open_frame = res_bro.dataframe.iloc[oi]
+        open_time = time_series[oi]
+        close_frame = res_bro.dataframe.iloc[ci]
+        close_time = time_series[ci]
+        frame = res_bro.dataframe.iloc[oi:ci+1]
+        trades.append((net, signal, entry_p, exit_p, best_price, oi, ci, frame))
+        if net < max_loss:
             max_loss_frame = frame
-            max_loss = r[2]
-        if r[2] < 0:
-            loss_frames.append((r[5], r[3], r[4], r[2], frame))
+            max_loss = net
+        if net < 0:
+            loss_frames.append((net, signal, entry_p, exit_p, best_price, oi, ci, frame))
 
 
     print(sum)
     return res_bro
 
-def resbrk_parentchild(key, secret, product, frequency, child_frequency='1h'):
+def resbrk_parentchild(key, secret, product, frequency, child_frequency='5m'):
     client = RestClient(False, key, secret, product)
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
 
@@ -106,18 +107,18 @@ def resbrk_parentchild(key, secret, product, frequency, child_frequency='1h'):
     fp.close()
     parent_dataframe = symbol.fetch_data(datetime.utcnow(), data=data, frequency=frequency)
 
-    fp = open('XBTUSD_1h_365days.txt', 'r')
+    fp = open('XBTUSD_5m_100days.txt', 'r')
     data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
     fp.close()
     child_dataframe = symbol.fetch_data(datetime.utcnow(), data=data, frequency=child_frequency)
 
     # parent_dataframe = import_data(symbol, "XBTUSD_1h_365days.txt")
-    bt = ResistanceBreakoutParentChildBackTest(parent_dataframe.iloc[-1 * 24 * 360:], child_dataframe, frequency, child_frequency=child_frequency)
+    bt = ResistanceBreakoutParentChildBackTest(parent_dataframe.iloc[-1 * 24 * 30:], child_dataframe, frequency, child_frequency=child_frequency)
     bt.rolling_period = 15
-    bt.min_profit = 30
+    bt.min_profit = 50
     bt.min_loss = -100
-    bt.volume_factor = 0.5
-    bt.max_loss = -100
+    bt.volume_factor = 0.1
+    bt.max_loss = -150
 
     # macd, macd_sig = bt.MACD(12,26,9)
     # bt.dataframe["macd"] = macd
@@ -138,8 +139,9 @@ def resbrk_parentchild(key, secret, product, frequency, child_frequency='1h'):
         close_time = time_series[ci]
         frame = bt.dataframe.iloc[oi:ci + 1]
         child_frame = bt.child_dataframe[open_time:close_time]
+        max_loss = -3 * int(entry_p / 150)
         sum += net - 14.5
-        trades.append((signal, entry_p, exit_p, net, best_price, oi, ci, frame, child_frame))
+        trades.append((net, signal, entry_p, exit_p, best_price, oi, ci, frame, child_frame))
     return bt
 
 
@@ -200,5 +202,5 @@ if __name__ == '__main__':
     key = params['key']
     secret = params['secret']
     product = params['symbol']
-    frequency = '1d'
-    btc = resbrk_parentchild(key, secret, product, frequency)
+    frequency = '1h'
+    btc = resbrk_backtest(key, secret, product, frequency)

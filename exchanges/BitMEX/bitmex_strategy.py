@@ -67,9 +67,12 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
             return False
 
         self.entry_price = order.price
-        self.position_index = len(self.dataframe) - 1
         self.logger.info("Position opened for {} at price {} side {}".format(self.symbol.symbol, self.entry_price, side))
         self.best_price = self.entry_price
+        self.min_profit = int(self.entry_price / 150)
+        self.min_loss = -1 * 2 * self.min_profit
+        self.max_loss = -1 * 3 * self.min_profit
+        # TODO: Place a stop market order
         return True
 
     def close_position(self):
@@ -97,40 +100,6 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
             self.exit_price = close_order.get('price', 0)
             self.logger.info("Position closed for {} at price {}".format(self.symbol.symbol, self.exit_price))
         return True
-
-    def enter_buy(self):
-        if self.dataframe["High"][-1] >= self.dataframe["roll_max_cp"][-1] and \
-                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2] and \
-                self.book['ltp'] - self.dataframe["Adj Close"][-1] > self.dataframe["ATR"][-1]:
-            self.logger.info("Enter BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
-            return True
-
-        return False
-
-    def enter_sell(self):
-        if self.dataframe["Low"][-1] <= self.dataframe["roll_min_cp"][-1] and \
-                self.dataframe["Volume"][-1] > self.volume_factor * self.dataframe["roll_max_vol"][-2] and \
-                self.dataframe["Adj Close"][-1] - self.book['ltp'] > self.dataframe["ATR"][-1]:
-            self.logger.info("Enter SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
-            return True
-
-        return False
-
-    def exit_buy(self):
-        if self.book['ltp'] < self.dataframe["Adj Close"][-1] - self.dataframe["ATR"][-1] and \
-                self.close_price_within_limits() is True:
-            self.logger.info("Exit BUY satisfied:\n%s" % self.dataframe.iloc[-2:])
-            return True
-
-        return False
-
-    def exit_sell(self):
-        if self.book['ltp'] > self.dataframe["Adj Close"][-1] + self.dataframe["ATR"][-1] and \
-                self.close_price_within_limits() is True:
-            self.logger.info("Exit SELL satisfied:\n%s" % self.dataframe.iloc[-2:])
-            return True
-
-        return False
 
 
 def run_resistance_breakout():
