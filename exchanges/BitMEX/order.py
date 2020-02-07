@@ -21,6 +21,7 @@ class Order:
         self.execType = None
         self.cumQty = None
         self.workingIndicator = None
+        self.stopPx = None
         # self.parent_order = user.parent_order
         self.wait = True
 
@@ -62,7 +63,7 @@ class Order:
         return order
 
     def amend(self, **kwargs):
-
+        kwargs['orderID'] = self.orderID
         order = self.client.amend_order(**kwargs)
 
         if order is None:

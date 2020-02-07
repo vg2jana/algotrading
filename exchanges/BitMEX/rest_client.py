@@ -86,12 +86,12 @@ class RestClient:
 
         return order
 
-    def cancel_all(self):
-
+    def cancel_all(self, **kwargs):
+        kwargs['symbol'] = self.symbol
         orders = None
 
         try:
-            orders, response = self.api.Order.Order_cancelAll().result()
+            orders, response = self.api.Order.Order_cancelAll(**kwargs).result()
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Failed to cancel all orders")

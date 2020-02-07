@@ -63,7 +63,7 @@ def resbrk_backtest(key, secret, product, frequency):
     data = [eval(d.replace('datetime.datetime', 'datetime')) for d in fp.readlines()]
     fp.close()
     dataframe = symbol.fetch_data(datetime.utcnow(), data=data, frequency=frequency)
-    res_bro = ResistanceBreakoutBackTest(dataframe.iloc[-1 * 24 * 360:])
+    res_bro = ResistanceBreakoutBackTest(dataframe.iloc[-1 * 24 * 30:])
     res_bro.rolling_period = 15
     # res_bro.min_profit = 50
     # res_bro.min_loss = -100

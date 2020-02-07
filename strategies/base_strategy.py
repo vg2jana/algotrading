@@ -245,7 +245,7 @@ class SinglePosition(Strategy):
                 if self.open_position() is not True:
                     self.signal = None
 
-        # self.last_frame = len(self.dataframe)
+        self.last_frame = len(self.dataframe)
 
     def time_bound_run(self, seconds):
         start_time = datetime.now()
@@ -257,8 +257,8 @@ class SinglePosition(Strategy):
         # Being run
         while lapsed_seconds <= seconds:
             self.before_run()
-            # if len(self.dataframe) > self.last_frame:
-            self.run()
+            if len(self.dataframe) > self.last_frame:
+                self.run()
             self.after_run()
             curr_time = datetime.now()
             lapsed_seconds = curr_time - start_time
