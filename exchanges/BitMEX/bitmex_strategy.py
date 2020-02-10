@@ -136,7 +136,6 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
             side = 'Buy'
 
         stop_price = self.entry_price + (abs(self.max_loss) * multiplier)
-
         order = None
         attempts = 10
         while attempts > 0:
@@ -169,6 +168,8 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
         if self.stop_order is None:
             self.logger.warning("No stop order found to amend")
             return
+
+        stop_price = round(stop_price * 2) / 2
 
         attempts = 10
         while attempts > 0:

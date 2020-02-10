@@ -223,12 +223,13 @@ class ResistanceBreakout(SinglePosition):
 
     def exit_buy(self):
         # Update best_price value
-        if self.dataframe["High"][-1] > self.best_price:
-            self.best_price = self.dataframe["High"][-1]
+        if self.book['ltp'] is not None and self.book['ltp'] > self.best_price:
+            self.best_price = self.book['ltp']
 
             if self.best_price >= self.entry_price + self.min_profit:
                 # Update the stop loss order
                 self.stop_price = self.entry_price + (self.best_price - self.entry_price) / 1.5
+                self.stop_price = round(self.stop_price * 2) / 2
 
         if self.dataframe["Adj Close"][-1] < self.dataframe["Adj Close"][-2] - self.dataframe["ATR"][-2] and \
                 self.close_price_within_limits() is True:
@@ -239,12 +240,13 @@ class ResistanceBreakout(SinglePosition):
 
     def exit_sell(self):
         # Update best_price value
-        if self.dataframe["Low"][-1] > self.best_price:
-            self.best_price = self.dataframe["Low"][-1]
+        if self.book['ltp'] is not None and self.book['ltp'] < self.best_price:
+            self.best_price = self.book['ltp']
 
             if self.best_price <= self.entry_price - self.min_profit:
                 # Update the stop loss order
                 self.stop_price = self.entry_price - ((self.entry_price - self.best_price) / 1.5)
+                self.stop_price = round(self.stop_price * 2) / 2
 
         if self.dataframe["Adj Close"][-1] > self.dataframe["Adj Close"][-2] + self.dataframe["ATR"][-2] and \
                 self.close_price_within_limits() is True:
