@@ -112,7 +112,7 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
             self.logger.info("Position opened for {} at price {} side {}".format(self.symbol.symbol, self.entry_price,
                                                                                  self.order.side))
             self.best_price = self.entry_price
-            self.min_profit = 10#int(self.entry_price / 150)
+            self.min_profit = int(self.entry_price / 150)
             self.min_loss = -2 * self.min_profit
             self.max_loss = -3 * self.min_profit
 
@@ -255,7 +255,7 @@ if __name__ == '__main__':
     key = params['key']
     secret = params['secret']
     product = params['symbol']
-    frequency = '1m'
+    frequency = '1h'
 
     logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
                         filename='app.log')
@@ -268,5 +268,5 @@ if __name__ == '__main__':
     websocket = MyWebSocket(endpoint, product, key, secret)
     websocket.connect_ws()
     symbol = BitMEXSymbol(product, client=client, frequency=frequency)
-    dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(hours=4), count=200))
+    dataframe = pd.DataFrame(symbol.fetch_data(datetime.utcnow() - timedelta(days=4), count=200))
     res_bro = run_resistance_breakout()
