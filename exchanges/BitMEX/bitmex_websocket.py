@@ -6,6 +6,7 @@ import json
 import logging
 import urllib
 import math
+import ssl
 from exchanges.BitMEX.api_key import generate_nonce, generate_signature
 
 # Naive implementation of connecting to BitMEX websocket for streaming realtime data.
@@ -125,7 +126,7 @@ class BitMEXWebsocket:
                                          on_error=self.__on_error,
                                          header=self.__get_auth())
 
-        self.wst = threading.Thread(target=lambda: self.ws.run_forever())
+        self.wst = threading.Thread(target=lambda: self.ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE}))
         self.wst.daemon = True
         self.wst.start()
         self.logger.debug("Started thread")
@@ -194,7 +195,7 @@ class BitMEXWebsocket:
             args = []
         self.ws.send(json.dumps({"op": command, "args": args}))
 
-    def __on_message(self, ws, message):
+    def __on_message(self, message):
         '''Handler for parsing WS messages.'''
         message = json.loads(message)
 
@@ -252,18 +253,18 @@ class BitMEXWebsocket:
         except:
             self.logger.error(traceback.format_exc())
 
-    def __on_error(self, ws, error):
+    def __on_error(self, error):
         '''Called on fatal websocket errors. We restart on these.'''
         if not self.exited:
             self.logger.error("Error : %s" % error)
             self.restart()
             # raise websocket.WebSocketException(error)
 
-    def __on_open(self, ws):
+    def __on_open(self):
         '''Called when the WS opens.'''
         self.logger.debug("Websocket Opened.")
 
-    def __on_close(self, ws):
+    def __on_close(self):
         '''Called on websocket close.'''
         self.logger.info('Websocket Closed')
 
