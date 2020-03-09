@@ -210,7 +210,14 @@ class ResistanceBreakOutBitMEX(ResistanceBreakout):
 
         # Amend the stop price if needed.
         elif self.stop_order is not None and self.stop_price is not None and self.stop_order.stopPx != self.stop_price:
-            self.stop_order_amend()
+            # Check if stop order is executed
+            self.stop_order.get_status()
+            if self.stop_order.ordStatus in ('Filled',):
+                self.stop_order = None
+                self.stop_price = None
+                self.signal = None
+            else:
+                self.stop_order_amend()
 
         # Cancel any stop orders on no signal
         if self.stop_order is not None and self.signal is None:

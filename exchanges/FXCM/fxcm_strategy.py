@@ -4,6 +4,7 @@ import json
 import fxcmpy
 import os
 import sys
+import time
 
 
 def connect():
@@ -51,8 +52,8 @@ class Symbol:
         else:
             pos = self.positions[self.positions['amountK'] == self.positions['amountK'].max()]
             pos = pos.to_dict('records')[0]
-            # amount = math.ceil(pos['amountK'] * self.config['ratio'])
-            amount = pos['amountK'] + self.config['amount']
+            amount = math.ceil(pos['amountK'] * self.config['ratio'])
+            # amount = pos['amountK'] + self.config['amount']
             ohlc = con.get_last_price(self.symbol).to_dict()
 
             if pos['isBuy'] is True:
@@ -117,3 +118,4 @@ swing = SwingTrading(symbols)
 while True:
     swing.before_run()
     swing.run()
+    time.sleep(5)
