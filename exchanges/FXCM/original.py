@@ -2,7 +2,7 @@ import fxcmpy
 import time
 
 #initiating API connection and defining trade parameters
-con = fxcmpy.fxcmpy(access_token="24fc9c161bf5887dab9ef3f1e7d44e31e9f92939", log_level='error', server='demo')
+con = fxcmpy.fxcmpy(access_token="524911a7df20d7b009e2ee50dd8c8e467b485420", log_level='info', server='demo', log_file="fxcm_api.log")
 pair = 'EUR/USD'
 
 

@@ -19,6 +19,7 @@ class Symbol:
         self.symbol = symbol
         self.is_subscribed = False
         self.positions = None
+        self.orders = None
         self.config = config
 
     def subscribe(self):
@@ -40,7 +41,7 @@ class Symbol:
         return close
 
     def run(self):
-        if self.positions is None:
+        if self.positions is None or len(self.positions) == 0:
             if os.path.exists('STOP'):
                 return
             isBuy = random.choice([True, False])
@@ -52,7 +53,7 @@ class Symbol:
         else:
             pos = self.positions[self.positions['amountK'] == self.positions['amountK'].max()]
             pos = pos.to_dict('records')[0]
-            amount = math.ceil(pos['amountK'] * self.config['ratio'])
+            # amount = math.ceil(pos['amountK'] * self.config['ratio'])
             # amount = pos['amountK'] + self.config['amount']
             ohlc = con.get_last_price(self.symbol).to_dict()
 
@@ -65,10 +66,18 @@ class Symbol:
 
             if self.close_positions(pos, ohlc) is True:
                 con.close_all_for_symbol(self.symbol)
-            elif isBuy is True and ohlc['Bid'] > price:
-                con.create_market_buy_order(self.symbol, amount)
-            elif isBuy is False and ohlc['Ask'] < price:
-                con.create_market_sell_order(self.symbol, amount)
+            # elif isBuy is True and ohlc['Bid'] > price:
+            #     con.create_market_buy_order(self.symbol, amount)
+            # elif isBuy is False and ohlc['Ask'] < price:
+            #     con.create_market_sell_order(self.symbol, amount)
+            amount = self.positions.loc[self.positions['isBuy'] == pos['isBuy']]['amounK'].sum
+            amount = math.ceil(amount.get_item() * self.config['ratio'])
+            df = self.orders.loc[self.orders['isBuy'] == isBuy]
+            if df.empty is True:
+                try:
+                    con.create_entry_order(symbol.symbol, isBuy, amount, 'GTC', rate=price, limit=price * 2)
+                except:
+                    pass
 
 
 class SwingTrading:
@@ -79,7 +88,8 @@ class SwingTrading:
     def before_run(self):
         while True:
             try:
-                df = con.get_open_positions()
+                positions = con.get_open_positions()
+                orders = con.get_orders()
             except Exception as e:
                 print(e)
                 try:
@@ -88,13 +98,18 @@ class SwingTrading:
                     print(e)
             else:
                 break
-        if df.empty is True:
+
+        if positions.empty is True:
             if os.path.exists('STOP'):
                 sys.exit(0)
+            for symbol in self.symbols:
+                symbol.positions = None
             return
+
         for symbol in self.symbols:
-            if symbol.symbol in df.currency.values:
-                symbol.positions = df.loc[df['currency'] == symbol.symbol]
+            # if symbol.symbol in df.currency.values:
+            symbol.positions = positions.loc[positions['currency'] == symbol.symbol]
+            symbol.orders = orders.loc[orders['currency'] == symbol.symbol]
 
     def run(self):
         for symbol in self.symbols:
