@@ -5,14 +5,17 @@ import fxcmpy
 import os
 import sys
 import time
+import logging
 from datetime import datetime
 from copy import deepcopy
 
 
 def connect():
     global con
+    global log
     print("Reconnecting to FXCM...")
     con = fxcmpy.fxcmpy(access_token=data['global']['token'], log_level='info', server='demo', log_file='fxcm_api.log')
+    log = logging.getLogger('FXCM')
     con.subscribe_data_model('Order')
     con.subscribe_data_model('OpenPosition')
     return con
@@ -97,17 +100,44 @@ class Symbol:
         self.summary = summary
         return summary
 
+    def update_table(self, table_name, prev_count):
+        orders = con.orders
+        positions = con.open_pos
+
+        lapsed = lapsed_seconds
+        while lapsed <= refresh_time:
+            try:
+                if table_name == 'order':
+                    count = len([o for o in orders.values() if o.get_currency() == self.symbol])
+                    if count > prev_count:
+                        break
+                elif table_name == 'positions':
+                    count = len([p for p in positions.values() if p.get_currency() == self.symbol])
+                    if count > prev_count:
+                        break
+            except Exception as e:
+                log.warning("update_table Loop warning: %s" % e)
+            finally:
+                ct = datetime.now()
+                delta = ct - start_time
+                lapsed = delta.total_seconds()
+
     def run(self):
         if len(self.positions) == 0:
             if os.path.exists('STOP'):
                 return
             isBuy = random.choice([True, False])
             amount = self.config['amount']
-            if isBuy is True:
-                con.create_market_buy_order(self.symbol, amount)
+            try:
+                if isBuy is True:
+                    con.create_market_buy_order(self.symbol, amount)
+                else:
+                    con.create_market_sell_order(self.symbol, amount)
+            except Exception as e:
+                log.warning("Market order warning: %s" % e)
             else:
-                con.create_market_sell_order(self.symbol, amount)
-        else:
+                self.update_table('positions', 0)
+        elif len(self.orders) == 0:
             summary = self.get_summary()
             buy_amount = summary['buyAmount']
             sell_amount = summary['sellAmount']
@@ -123,11 +153,12 @@ class Symbol:
 
             amount = math.ceil(amount)
 
-            if len(self.orders) == 0:
-                try:
-                    con.create_entry_order(symbol.symbol, isBuy, amount, 'GTC', rate=price, limit=price*3)
-                except:
-                    pass
+            try:
+                con.create_entry_order(symbol.symbol, isBuy, amount, 'GTC', rate=price, limit=price*3)
+            except Exception as e:
+                log.warning("Entry order warning: %s" % e)
+            else:
+                self.update_table('order', 0)
 
 
 class SwingTrading:
@@ -158,7 +189,7 @@ class SwingTrading:
                     continue
                 s.positions.append(order)
         except Exception as e:
-            print(e)
+            log.warning("before_run Loop warning: %s" % e)
 
     def run(self):
         for symbol, s in self.symbols.items():
@@ -174,10 +205,12 @@ class SwingTrading:
                 for o in symbol.orders:
                     try:
                         o.delete()
-                    except:
-                        pass
+                    except Exception as e:
+                        log.warning("Close order warning: %s" % e)
+
 
 con = None
+log = None
 with open('config.json', 'r') as f:
     data = json.load(f)
 connect()
@@ -190,14 +223,16 @@ for s, c in data["symbols"].items():
 swing = SwingTrading(symbols)
 
 start_time = datetime.now()
-lapsed_seconds = 60
+refresh_time = 60
+lapsed_seconds = refresh_time
 while True:
-    if lapsed_seconds >= 45:
+    if lapsed_seconds >= refresh_time:
         call_api('orders')
         call_api('positions')
         start_time = datetime.now()
     swing.before_run()
     swing.run()
+    time.sleep(1)
     curr_time = datetime.now()
     lapsed_seconds = curr_time - start_time
     lapsed_seconds = lapsed_seconds.total_seconds()
