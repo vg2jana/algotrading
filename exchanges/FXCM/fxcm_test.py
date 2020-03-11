@@ -198,10 +198,10 @@ class SwingTrading:
             s.run()
 
     def close(self):
-        for symbol in self.symbols:
+        for symbol in self.symbols.values():
             if symbol.close_positions() is True:
                 con.close_all_for_symbol(symbol.symbol)
-                time.sleep(2)
+                time.sleep(10)
                 for o in symbol.orders:
                     try:
                         o.delete()
@@ -232,6 +232,7 @@ while True:
         start_time = datetime.now()
     swing.before_run()
     swing.run()
+    swing.close()
     time.sleep(1)
     curr_time = datetime.now()
     lapsed_seconds = curr_time - start_time
