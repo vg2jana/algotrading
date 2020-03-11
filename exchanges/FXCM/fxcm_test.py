@@ -60,7 +60,7 @@ class Symbol:
         con.subscribe_market_data(self.symbol)
 
     def close_positions(self):
-        if len(self.positions) == 0:
+        if len(self.positions) == 0 or len(self.summary) == 0:
             return
 
         close = False
