@@ -61,6 +61,7 @@ class User:
             for o in self.orders:
                 if o['ordType'] == 'MarketIfTouched':
                     tp_order = o
+                    self.take_profit_order = o
 
             for o in opposite.orders:
                 if o['ordType'] == 'Stop':
