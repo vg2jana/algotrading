@@ -58,6 +58,9 @@ class User:
         if self.position['isOpen'] is True:
             tp_order = None
             stop_exists = False
+            curr_qty = abs(self.position['currentQty'])
+            opp_qty = abs(opposite.position['currentQty'])
+
             for o in self.orders:
                 if o['ordType'] == 'MarketIfTouched':
                     tp_order = o
@@ -70,21 +73,17 @@ class User:
             if tp_order is None:
                 tp_price = self.position['avgEntryPrice'] + int(sign *
                     self.position['avgEntryPrice'] * data['profitPercent'] / 100)
-                qty = self.position['currentQty']
-                self.client.new_order(orderQty=qty, ordType="MarketIfTouched", execInst="LastPrice",
+                self.client.new_order(orderQty=curr_qty, ordType="MarketIfTouched", execInst="LastPrice",
                                           side=opposite.side, stopPx=tp_price)
                 time.sleep(5)
-            elif tp_order['orderQty'] != self.position['currentQty']:
-                self.client.amend_order(orderID=tp_order['orderID'], orderQty=self.position['currentQty'])
+            elif tp_order['orderQty'] != curr_qty:
+                self.client.amend_order(orderID=tp_order['orderID'], orderQty=curr_qty)
                 time.sleep(5)
 
-            if stop_exists is False and self.position['currentQty'] > opposite.position['currentQty']:
-                curr_qty = self.position['currentQty']
-                opp_qty = opposite.position['currentQty']
+            if stop_exists is False and curr_qty > opp_qty:
                 entry_price = self.position['avgEntryPrice']
                 opp_entry_price = self.position['avgEntryPrice'] - int(sign *
                         self.position['avgEntryPrice'] * data['swingPercent'] / 100)
-                # exit_price = math.ceil(entry_price + (sign * entry_price * data['profitPercent'] / 100))
                 opp_exit_price = math.ceil(opp_entry_price - (sign * opp_entry_price * data['profitPercent'] / 100))
                 curr_sum = curr_qty * abs(opp_exit_price - entry_price)
                 for n in range(1, 10000):

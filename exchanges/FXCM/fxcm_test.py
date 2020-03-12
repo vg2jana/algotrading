@@ -139,8 +139,7 @@ class Symbol:
                     con.create_market_sell_order(self.symbol, amount)
             except Exception as e:
                 log.warning("Market order warning: %s" % e)
-            else:
-                self.update_table('positions', 0)
+            self.update_table('positions', 0)
         elif len(self.orders) == 0:
             summary = self.get_summary()
             buy_amount = summary['buyAmount']
@@ -161,8 +160,7 @@ class Symbol:
                 con.create_entry_order(symbol.symbol, isBuy, amount, 'GTC', rate=price, limit=price*3)
             except Exception as e:
                 log.warning("Entry order warning: %s" % e)
-            else:
-                self.update_table('order', 0)
+            self.update_table('order', 0)
 
 
 class SwingTrading:
