@@ -78,7 +78,7 @@ class User:
                 self.client.amend_order(orderID=tp_order['orderID'], orderQty=self.position['currentQty'])
                 time.sleep(5)
 
-            if stop_exists is False:
+            if stop_exists is False and self.position['currentQty'] > opposite.position['currentQty']:
                 curr_qty = self.position['currentQty']
                 opp_qty = opposite.position['currentQty']
                 entry_price = self.position['avgEntryPrice']
