@@ -3,7 +3,7 @@ import random
 import time
 import math
 import logging
-from exchanges.BitMEX.rest_client import RestClient
+from rest_client import RestClient
 
 
 class User:

@@ -13,7 +13,10 @@ from copy import deepcopy
 def connect():
     global con
     global log
-    print("Reconnecting to FXCM...")
+    if con is not None:
+        log.info("Closing existing connection")
+        con.close()
+    log.info("Connecting to FXCM...")
     con = fxcmpy.fxcmpy(access_token=data['global']['token'], log_level='info', server='demo', log_file='fxcm_api.log')
     log = logging.getLogger('FXCM')
     con.subscribe_data_model('Order')
