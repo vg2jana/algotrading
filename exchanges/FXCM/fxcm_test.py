@@ -13,15 +13,24 @@ from copy import deepcopy
 def connect():
     global con
     global log
-    if con is not None:
-        log.info("Closing existing connection")
-        con.close()
-        time.sleep(10)
-    print("Connecting to FXCM...")
-    con = fxcmpy.fxcmpy(access_token=data['global']['token'], log_level='info', server='demo', log_file='fxcm_api.log')
-    log = logging.getLogger('FXCM')
-    con.subscribe_data_model('Order')
-    con.subscribe_data_model('OpenPosition')
+    while True:
+        try:
+            if con is not None:
+                log.info("Closing existing connection")
+                con.close()
+                time.sleep(10)
+            print("Connecting to FXCM...")
+            con = fxcmpy.fxcmpy(access_token=data['global']['token'], log_level='info', server='demo', log_file='fxcm_api.log')
+            log = logging.getLogger('FXCM')
+            con.subscribe_data_model('Order')
+            con.subscribe_data_model('OpenPosition')
+        except Exception as e:
+            if hasattr(log, 'info'):
+                log.error(e)
+            time.sleep(30)
+        else:
+            break
+
     return con
 
 
@@ -35,16 +44,13 @@ def call_api(api, args=None):
             elif api == 'positions':
                 result = con.get_open_positions()
         except Exception as e:
-            print(e)
+            log.warning("Call API warning: %s" % e)
             try:
                 if con.is_connected() is False:
-                    con.connect()
-                    con.subscribe_data_model('Order')
-                    con.subscribe_data_model('OpenPosition')
-                else:
                     connect()
+                    time.sleep(10)
             except Exception as e:
-                print(e)
+                log.warning("Call API reconnect warning: %s" % e)
         else:
             break
 
@@ -72,7 +78,7 @@ class Symbol:
         ohlc = con.get_last_price(self.symbol)
 
         if self.summary['buyAmount'] == 0 or self.summary['sellAmount'] == 0:
-            tp = tp / 2
+            tp = tp / 3
 
         if ohlc['Bid'] > self.summary['buyPrice'] + tp:
             log.info("OHLC at closing: %s" % ohlc)
@@ -104,15 +110,15 @@ class Symbol:
         }
 
         if summary['buyAmount'] > summary['sellAmount']:
-            side = 'sell'
+            isBuy = False
             curr_qty = summary['buyAmount']
             opp_qty = summary['sellAmount']
-            price = summary['sellPrice']
+            price = summary['buyPrice'] - self.config['swing']
         else:
-            side = 'buy'
+            isBuy = True
             curr_qty = summary['sellAmount']
             opp_qty = summary['buyAmount']
-            price = summary['buyPrice']
+            price = summary['sellPrice'] + self.config['swing']
 
         losing_sum = curr_qty * (self.config['takeProfit'] + self.config['swing'])
         for n in range(1, 10000):
@@ -121,7 +127,7 @@ class Symbol:
                 break
 
         summary['nextQty'] = (curr_qty + n) - opp_qty
-        summary['nextSide'] = side
+        summary['nextSide'] = isBuy
         summary['nextPrice'] = price
 
         self.summary = summary
@@ -180,7 +186,8 @@ class Symbol:
             # amount = math.ceil(amount)
 
             try:
-                con.create_entry_order(symbol.symbol, summary['nextSide'], summary['nextQty'], 'GTC', rate=summary['nextPrice'])
+                con.create_entry_order(self.symbol, summary['nextSide'], summary['nextQty'], 'GTC',
+                                       rate=summary['nextPrice'])
             except Exception as e:
                 log.warning("Entry order warning: %s" % e)
             self.update_table('order', 0)

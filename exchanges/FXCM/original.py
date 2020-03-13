@@ -5,7 +5,6 @@ import time
 con = fxcmpy.fxcmpy(access_token="524911a7df20d7b009e2ee50dd8c8e467b485420", log_level='info', server='demo', log_file="fxcm_api.log")
 pair = 'EUR/USD'
 
-
 #get historical data
 # data = con.get_candles(pair, period='m5', number=250)
 """periods can be m1, m5, m15 and m30, H1, H2, H3, H4, H6 and H8, D1, W1, M1"""

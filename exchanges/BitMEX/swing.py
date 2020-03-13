@@ -93,8 +93,13 @@ class User:
 
                 qty = curr_qty + n - opp_qty
                 if qty > 0:
-                    stop_price = int(self.position['avgEntryPrice'] - (sign *
-                        self.position['avgEntryPrice'] * data['swingPercent'] / 100))
+                    if type(opposite.position) is dict:
+                        avg_entry_price = opposite.position['avgEntryPrice']
+                        stop_price = int(avg_entry_price)
+                    else:
+                        avg_entry_price = self.position['avgEntryPrice']
+                        stop_price = int(avg_entry_price - (sign * avg_entry_price * data['swingPercent'] / 100))
+
                     opposite.client.new_order(orderQty=qty, ordType="Stop", execInst="LastPrice",
                                                side=opposite.side, stopPx=stop_price)
                     time.sleep(5)
