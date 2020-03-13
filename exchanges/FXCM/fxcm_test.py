@@ -75,8 +75,10 @@ class Symbol:
             tp = tp / 2
 
         if ohlc['Bid'] > self.summary['buyPrice'] + tp:
+            log.info("OHLC at closing: %s" % ohlc)
             close = True
         if ohlc['Ask'] < self.summary['sellPrice'] - tp:
+            log.info("OHLC at closing: %s" % ohlc)
             close = True
 
         return close
@@ -100,6 +102,27 @@ class Symbol:
             'buyPrice': buy_price,
             'sellPrice': sell_price
         }
+
+        if summary['buyAmount'] > summary['sellAmount']:
+            side = 'sell'
+            curr_qty = summary['buyAmount']
+            opp_qty = summary['sellAmount']
+            price = summary['sellPrice']
+        else:
+            side = 'buy'
+            curr_qty = summary['sellAmount']
+            opp_qty = summary['buyAmount']
+            price = summary['buyPrice']
+
+        losing_sum = curr_qty * (self.config['takeProfit'] + self.config['swing'])
+        for n in range(1, 10000):
+            gaining_sum = (curr_qty + n) * self.config['takeProfit']
+            if gaining_sum - losing_sum > self.config["minProfit"]:
+                break
+
+        summary['nextQty'] = (curr_qty + n) - opp_qty
+        summary['nextSide'] = side
+        summary['nextPrice'] = price
 
         self.summary = summary
         return summary
@@ -142,22 +165,22 @@ class Symbol:
             self.update_table('positions', 0)
         elif len(self.orders) == 0:
             summary = self.get_summary()
-            buy_amount = summary['buyAmount']
-            sell_amount = summary['sellAmount']
-
-            if buy_amount > sell_amount:
-                isBuy = False
-                price = summary['buyPrice'] - self.config['swing']
-                amount = buy_amount * self.config['ratio'] - sell_amount
-            else:
-                isBuy = True
-                price = summary['sellPrice'] + self.config['swing']
-                amount = sell_amount * self.config['ratio'] - buy_amount
-
-            amount = math.ceil(amount)
+            # buy_amount = summary['buyAmount']
+            # sell_amount = summary['sellAmount']
+            #
+            # if buy_amount > sell_amount:
+            #     isBuy = False
+            #     price = summary['buyPrice'] - self.config['swing']
+            #     amount = buy_amount * self.config['ratio'] - sell_amount
+            # else:
+            #     isBuy = True
+            #     price = summary['sellPrice'] + self.config['swing']
+            #     amount = sell_amount * self.config['ratio'] - buy_amount
+            #
+            # amount = math.ceil(amount)
 
             try:
-                con.create_entry_order(symbol.symbol, isBuy, amount, 'GTC', rate=price, limit=price*3)
+                con.create_entry_order(symbol.symbol, summary['nextSide'], summary['nextQty'], 'GTC', rate=summary['nextPrice'])
             except Exception as e:
                 log.warning("Entry order warning: %s" % e)
             self.update_table('order', 0)

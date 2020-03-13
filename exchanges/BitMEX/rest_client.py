@@ -104,7 +104,7 @@ class RestClient:
 
         return orders
 
-    def get_order(self, **kwargs):
+    def get_orders(self, **kwargs):
 
         order = None
 

@@ -37,7 +37,7 @@ class User:
     def time_to_close(self):
         close = False
         if self.take_profit_order is not None:
-            o = self.client.get_order(orderID=self.take_profit_order['orderID'])
+            o = self.client.get_orders(filter='{"orderID": "%s"}' % self.take_profit_order['orderID'])
             if o is not None and o['ordStatus'] == 'Filled':
                 close = True
 
@@ -71,8 +71,8 @@ class User:
                     stop_exists = True
 
             if tp_order is None:
-                tp_price = self.position['avgEntryPrice'] + int(sign *
-                    self.position['avgEntryPrice'] * data['profitPercent'] / 100)
+                tp_price = int(self.position['avgEntryPrice'] + (sign *
+                    self.position['avgEntryPrice'] * data['profitPercent'] / 100))
                 self.client.new_order(orderQty=curr_qty, ordType="MarketIfTouched", execInst="LastPrice",
                                           side=opposite.side, stopPx=tp_price)
                 time.sleep(5)
@@ -91,10 +91,10 @@ class User:
                     if opp_sum - curr_sum > opp_entry_price * 0.01:
                         break
 
-                qty = curr_qty + n
+                qty = curr_qty + n - opp_qty
                 if qty > 0:
-                    stop_price = self.position['avgEntryPrice'] - int(sign *
-                        self.position['avgEntryPrice'] * data['swingPercent'] / 100)
+                    stop_price = int(self.position['avgEntryPrice'] - (sign *
+                        self.position['avgEntryPrice'] * data['swingPercent'] / 100))
                     opposite.client.new_order(orderQty=qty, ordType="Stop", execInst="LastPrice",
                                                side=opposite.side, stopPx=stop_price)
                     time.sleep(5)
