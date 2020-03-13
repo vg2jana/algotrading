@@ -93,7 +93,7 @@ class User:
 
                 qty = curr_qty + n - opp_qty
                 if qty > 0:
-                    if type(opposite.position) is dict:
+                    if type(opposite.position) is dict and opposite.position['avgEntryPrice'] > 0:
                         avg_entry_price = opposite.position['avgEntryPrice']
                         stop_price = int(avg_entry_price)
                     else:
