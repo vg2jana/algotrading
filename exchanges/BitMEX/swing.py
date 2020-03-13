@@ -136,9 +136,9 @@ while True:
             len(sell_position) == 0 or sell_position['isOpen'] is False):
         side = random.choice(('Buy', 'Sell'))
         if side == 'Buy':
-            buy_user.client.new_order(ordType='Market', orderQty=data['startQty'])
+            buy_user.client.new_order(ordType='Market', orderQty=data['startQty'], side=side)
         else:
-            sell_user.client.new_order(ordType='Market', orderQty=data['startQty'])
+            sell_user.client.new_order(ordType='Market', orderQty=data['startQty'], side=side)
         time.sleep(5)
 
     buy_user.manage_orders(sell_user)
