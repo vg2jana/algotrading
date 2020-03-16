@@ -55,7 +55,7 @@ class User:
 
     def manage_orders(self, opposite):
         sign = 1 if self.side == 'Buy' else -1
-        if self.position['isOpen'] is True:
+        if len(self.position['isOpen']) > 0 and self.position['isOpen'] is True:
             tp_order = None
             stop_exists = False
             curr_qty = abs(self.position['currentQty'])
