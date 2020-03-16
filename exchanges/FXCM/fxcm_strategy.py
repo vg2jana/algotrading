@@ -69,7 +69,7 @@ class Symbol:
 
     def close_positions(self):
         close = False
-        if self.prev_pos_count < len(self.positions):
+        if self.prev_pos_count != 0 and self.prev_pos_count < len(self.positions):
             close = True
 
         return close
