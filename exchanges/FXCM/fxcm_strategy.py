@@ -32,7 +32,7 @@ def connect():
     return con
 
 
-def call_api(api, args=None):
+def call_api(api, *args):
     while True:
         try:
             if api == 'orders':
@@ -41,6 +41,8 @@ def call_api(api, args=None):
                 result = con.get_summary()
             elif api == 'positions':
                 result = con.get_open_positions()
+            elif api == 'delete':
+                result = con.delete_order(*args)
         except Exception as e:
             log.warning("Call API warning: %s" % e)
             try:
@@ -186,10 +188,9 @@ class SwingTrading:
                 continue
             con.close_all_for_symbol(symbol.symbol)
             time.sleep(2)
-            for o in symbol.orders:
+            for oid in symbol.orders['orderId'].to_list:
                 try:
-                    # TODO: use con.delete_order instead
-                    o.delete()
+                    call_api('delete', int(oid))
                 except Exception as e:
                     log.warning("Close order warning: %s" % e)
 
