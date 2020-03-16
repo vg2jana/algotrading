@@ -72,13 +72,19 @@ class User:
 
             if tp_order is None:
                 tp_price = int(self.position['avgEntryPrice'] + (sign *
-                    self.position['avgEntryPrice'] * data['profitPercent'] / 100))
+                    self.position['avgEntryPrice'] * data['profitPercent'] / 200))
                 self.client.new_order(orderQty=curr_qty, ordType="MarketIfTouched", execInst="LastPrice",
                                           side=opposite.side, stopPx=tp_price)
                 time.sleep(5)
             elif tp_order['orderQty'] != curr_qty:
                 self.client.amend_order(orderID=tp_order['orderID'], orderQty=curr_qty)
                 time.sleep(5)
+            elif len(opposite.position) > 0 and opposite.position['isOpen'] is True:
+                tp_price = int(self.position['avgEntryPrice'] + (sign *
+                    self.position['avgEntryPrice'] * data['profitPercent'] / 100))
+                if tp_order['stopPx'] != tp_price:
+                    self.client.amend_order(orderID=tp_order['orderID'], stopPx=tp_price)
+                    time.sleep(5)
 
             if stop_exists is False and curr_qty > opp_qty:
                 entry_price = self.position['avgEntryPrice']
