@@ -172,15 +172,19 @@ class SwingTrading:
             sys.exit(0)
 
         for symbol in self.symbols:
-            symbol.prev_pos_count = len(symbol.positions)
             if not positions.empty:
                 symbol.positions = positions.loc[positions['currency'] == symbol.symbol]
+            else:
+                symbol.positions = []
             if not orders.empty:
                 symbol.orders = orders.loc[orders['currency'] == symbol.symbol]
+            else:
+                symbol.orders = []
 
     def run(self):
         for symbol in self.symbols:
             symbol.run()
+            symbol.prev_pos_count = len(symbol.positions)
 
     def close(self):
         for symbol in self.symbols:
