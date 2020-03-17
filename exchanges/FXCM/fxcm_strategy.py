@@ -74,6 +74,8 @@ class Symbol:
         if self.prev_pos_count != 0 and self.prev_pos_count < len(self.positions):
             close = True
 
+        self.prev_pos_count = len(self.positions)
+
         return close
 
     def get_summary(self):
@@ -127,8 +129,8 @@ class Symbol:
         return summary
 
     def run(self):
-        limit = self.config['takeProfit'] * 10000
-        if len(self.positions) == 0 and stop_signal is False:
+        limit = self.config['takeProfit'] * (10 ** self.config["decimal"])
+        if len(self.positions) == 0 and stop_signal is False and len(self.orders) == 0:
             isBuy = random.choice([True, False])
             amount = self.config['amount']
             try:
@@ -148,10 +150,14 @@ class Symbol:
         if len(self.positions) > 1:
             pos = self.positions.reset_index()
             pos0 = pos.iloc[0].to_dict()
-            pos1 = pos.iloc[1].to_dict()
-            if pos0['limit'] != pos1['limit']:
+            if pos0['isBuy'] is True:
+                price = pos0['open'] + self.config['takeProfit']
+            else:
+                price = pos0['open'] - self.config['takeProfit']
+            price = round(price, self.config["decimal"])
+            if pos0['limit'] != price:
                 try:
-                    con.change_trade_stop_limit(pos0['tradeId'], False, pos1['limit'], is_in_pips=False)
+                    con.change_trade_stop_limit(pos0['tradeId'], False, price, is_in_pips=False)
                 except Exception as e:
                     log.warning("Position limit change warning: %s" % e)
                 time.sleep(2)
@@ -184,19 +190,28 @@ class SwingTrading:
     def run(self):
         for symbol in self.symbols:
             symbol.run()
-            symbol.prev_pos_count = len(symbol.positions)
 
     def close(self):
         for symbol in self.symbols:
-            if symbol.close_positions() is False:
-                continue
-            con.close_all_for_symbol(symbol.symbol)
-            time.sleep(2)
-            for oid in symbol.orders['orderId'].to_list:
-                try:
-                    call_api('delete', int(oid))
-                except Exception as e:
-                    log.warning("Close order warning: %s" % e)
+            close = False
+            delete = False
+            if symbol.close_positions() is True:
+                close = True
+                delete = True
+
+            if len(symbol.positions) == 0:
+                delete = True
+
+            if close is True:
+                con.close_all_for_symbol(symbol.symbol)
+                time.sleep(2)
+
+            if delete is True and len(symbol.orders) > 0:
+                for oid in symbol.orders['orderId'].to_list():
+                    try:
+                        call_api('delete', int(oid))
+                    except Exception as e:
+                        log.warning("Close order warning: %s" % e)
 
 
 con = None
@@ -206,9 +221,10 @@ with open('config.json', 'r') as f:
 connect()
 
 symbols = []
-for s, c in data["symbols"].items():
-    symbol = Symbol(s, c)
-    symbols.append(symbol)
+# for s, c in data["symbols"].items():
+symbol = Symbol("GBP/USD", data["symbols"]["GBP/USD"])
+# symbol = Symbol(s, c)
+symbols.append(symbol)
 
 swing = SwingTrading(symbols)
 refresh_time = 30

@@ -12,27 +12,11 @@ class User:
         self.symbol = symbol
         self.client = RestClient(test, key, secret, symbol)
         self.take_profit_order = None
+        self.stop_loss_order = None
+        self.next_stop_order = None
         self.position = {}
         self.orders = []
         self.side = side
-
-    def open_position(self):
-        while True:
-            pos = self.client.open_position()
-            if pos is None:
-                time.sleep(5)
-                continue
-            self.position = pos
-            return pos
-
-    def get_open_orders(self):
-        while True:
-            orders = self.client.open_orders()
-            if orders is None:
-                time.sleep(5)
-                continue
-            self.orders = orders
-            return orders
 
     def time_to_close(self):
         close = False
@@ -50,65 +34,103 @@ class User:
             self.client.close_position()
             time.sleep(1)
             self.take_profit_order = None
+            self.stop_loss_order = None
+            self.next_stop_order = None
         except Exception as e:
             log.warning("Close warning: %s" % e)
 
+    def update_orders(self):
+        self.take_profit_order = None
+        self.stop_loss_order = None
+        self.next_stop_order = None
+
+        for o in self.orders:
+            if o['ordType'] == 'Limit':
+                self.take_profit_order = o
+            elif o['ordType'] == 'Stop':
+                if o['side'] == self.side:
+                    self.next_stop_order = o
+                else:
+                    self.stop_loss_order = o
+
     def manage_orders(self, opposite):
         sign = 1 if self.side == 'Buy' else -1
-        if len(self.position) > 0 and self.position['isOpen'] is True:
-            tp_order = None
-            stop_exists = False
-            curr_qty = abs(self.position['currentQty'])
+        tp_order = self.take_profit_order
+        opp_tp_order = opposite.take_profit_order
+        curr_open = False
+        opposite_open = False
+        entry_price = None
+        opp_entry_price = None
+        curr_qty = 0
+        opp_qty = 0
+
+        if len(opposite.position) > 0 and opposite.position['isOpen'] is True:
+            opposite_open = True
+            opp_entry_price = opposite.position['avgEntryPrice']
             opp_qty = abs(opposite.position['currentQty'])
 
-            for o in self.orders:
-                if o['ordType'] == 'MarketIfTouched':
-                    tp_order = o
-                    self.take_profit_order = o
+        if len(self.position) > 0 and self.position['isOpen'] is True:
+            curr_open = True
+            entry_price = self.position['avgEntryPrice']
+            curr_qty = abs(self.position['currentQty'])
 
-            for o in opposite.orders:
-                if o['ordType'] == 'Stop':
-                    stop_exists = True
+        if curr_open is True:
+            #
+            # Take profit order
+            #
+            if opposite_open is False:
+                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 200))
+            else:
+                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
 
             if tp_order is None:
-                tp_price = int(self.position['avgEntryPrice'] + (sign *
-                    self.position['avgEntryPrice'] * data['profitPercent'] / 200))
-                self.client.new_order(orderQty=curr_qty, ordType="MarketIfTouched", execInst="LastPrice",
-                                          side=opposite.side, stopPx=tp_price)
+                self.client.new_order(orderQty=curr_qty, ordType="Limit", side=opposite.side, price=tp_price)
                 time.sleep(5)
-            elif tp_order['orderQty'] != curr_qty:
-                self.client.amend_order(orderID=tp_order['orderID'], orderQty=curr_qty)
+            elif (tp_order['orderQty'] != curr_qty) or (tp_order['price'] != tp_price):
+                self.client.amend_order(orderID=tp_order['orderID'], orderQty=curr_qty, price=tp_price)
                 time.sleep(5)
-            elif len(opposite.position) > 0 and opposite.position['isOpen'] is True:
-                tp_price = int(self.position['avgEntryPrice'] + (sign *
-                    self.position['avgEntryPrice'] * data['profitPercent'] / 100))
-                if tp_order['stopPx'] != tp_price:
-                    self.client.amend_order(orderID=tp_order['orderID'], stopPx=tp_price)
+
+            #
+            # Stop loss order
+            #
+            stop_loss_order = self.stop_loss_order
+            if stop_loss_order is None and opp_tp_order is not None:
+                self.client.new_order(orderQty=curr_qty, ordType="Stop", execInst="LastPrice",
+                                          side=opposite.side, stopPx=opp_tp_order['price'] - sign)
+                time.sleep(5)
+            elif stop_loss_order is not None and opp_tp_order is not None:
+                if stop_loss_order['orderQty'] != curr_qty or stop_loss_order['stopPx'] != opp_tp_order['price'] - sign:
+                    self.client.amend_order(orderID=stop_loss_order['orderID'],
+                                            orderQty=curr_qty, stopPx=opp_tp_order['price'] - sign)
                     time.sleep(5)
 
-            if stop_exists is False and curr_qty > opp_qty:
-                entry_price = self.position['avgEntryPrice']
-                opp_entry_price = self.position['avgEntryPrice'] - int(sign *
-                        self.position['avgEntryPrice'] * data['swingPercent'] / 100)
-                opp_exit_price = math.ceil(opp_entry_price - (sign * opp_entry_price * data['profitPercent'] / 100))
-                curr_sum = curr_qty * abs(opp_exit_price - entry_price)
-                for n in range(1, 10000):
-                    opp_sum = (curr_qty + n) * abs(opp_exit_price - opp_entry_price)
-                    if opp_sum - curr_sum > opp_entry_price * 0.01:
-                        break
+        #
+        # Next stop order
+        #
+        next_order = self.next_stop_order
+        if next_order is None and opposite_open is True and curr_qty < opp_qty and opposite.next_stop_order is None \
+                and opp_tp_order is not None:
+            if opp_tp_order['ordStatus'] == 'Filled':
+                return
+            if entry_price is None:
+                entry_price = int(opp_entry_price + (sign * opp_entry_price * data['swingPercent'] / 100))
+            if tp_order is None:
+                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
+            else:
+                tp_price = tp_order['price']
 
-                qty = curr_qty + n - opp_qty
-                if qty > 0:
-                    if type(opposite.position) is dict and opposite.position['avgEntryPrice'] > 0:
-                        avg_entry_price = opposite.position['avgEntryPrice']
-                        stop_price = int(avg_entry_price)
-                    else:
-                        avg_entry_price = self.position['avgEntryPrice']
-                        stop_price = int(avg_entry_price - (sign * avg_entry_price * data['swingPercent'] / 100))
+            losing_sum = opp_qty * abs(opp_entry_price - tp_price)
+            for n in range(1, 10000):
+                gaining_sum = (opp_qty + n) * abs(entry_price - tp_price)
+                if gaining_sum - losing_sum > entry_price * data['swingPercent'] / 100:
+                    break
 
-                    opposite.client.new_order(orderQty=qty, ordType="Stop", execInst="LastPrice",
-                                               side=opposite.side, stopPx=stop_price)
-                    time.sleep(5)
+            qty = opp_qty + n - curr_qty
+            if qty > 0:
+                stop_price = int(entry_price)
+                self.client.new_order(orderQty=qty, ordType="Stop",
+                                      execInst="LastPrice", side=self.side, stopPx=stop_price)
+                time.sleep(5)
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
@@ -118,7 +140,7 @@ config_file = "swing.json"
 with open(config_file, 'r') as f:
     data = json.load(f)
 
-test = True
+test = data['testRun']
 if test is True:
     data['user1'] = data['test']['user1']
     data['user2'] = data['test']['user2']
@@ -132,16 +154,28 @@ buy_user.close()
 sell_user.close()
 
 while True:
-    buy_position = buy_user.open_position()
-    sell_position = sell_user.open_position()
-    buy_orders = buy_user.get_open_orders()
-    sell_orders = sell_user.get_open_orders()
+    buy_position = buy_user.client.open_position()
+    sell_position = sell_user.client.open_position()
+    buy_orders = buy_user.client.open_orders()
+    sell_orders = sell_user.client.open_orders()
+
+    if buy_position is None or sell_position is None or buy_orders is None or sell_orders is None:
+        time.sleep(4)
+        continue
+
+    buy_user.position = buy_position
+    sell_user.position = sell_position
+    buy_user.orders = buy_orders
+    sell_user.orders = sell_orders
 
     if buy_user.time_to_close() is True or sell_user.time_to_close() is True:
         buy_user.close()
         sell_user.close()
         time.sleep(5)
         continue
+
+    buy_user.update_orders()
+    sell_user.update_orders()
 
     if (len(buy_position) == 0 or buy_position['isOpen'] is False) and (
             len(sell_position) == 0 or sell_position['isOpen'] is False):
