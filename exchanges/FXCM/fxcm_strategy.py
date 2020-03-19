@@ -71,7 +71,7 @@ class Symbol:
 
     def close_positions(self):
         close = False
-        if self.prev_pos_count != 0 and self.prev_pos_count < len(self.positions):
+        if self.prev_pos_count != 0 and len(self.positions) < self.prev_pos_count:
             close = True
 
         self.prev_pos_count = len(self.positions)
@@ -138,6 +138,7 @@ class Symbol:
             except Exception as e:
                 log.warning("Market order warning: %s" % e)
             time.sleep(2)
+
         elif len(self.orders) == 0:
             summary = self.get_summary()
             try:
@@ -148,8 +149,7 @@ class Symbol:
             time.sleep(2)
 
         if len(self.positions) > 1:
-            pos = self.positions.reset_index()
-            pos0 = pos.iloc[0].to_dict()
+            pos0 = self.positions.to_dict('records')[0]
             if pos0['isBuy'] is True:
                 price = pos0['open'] + self.config['takeProfit']
             else:
@@ -227,7 +227,7 @@ symbol = Symbol("GBP/USD", data["symbols"]["GBP/USD"])
 symbols.append(symbol)
 
 swing = SwingTrading(symbols)
-refresh_time = 30
+refresh_time = 50
 stop_signal = False
 while True:
     if os.path.exists('STOP'):

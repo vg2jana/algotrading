@@ -1,6 +1,8 @@
 import json
 import random
 import time
+import os
+import sys
 import math
 import logging
 from rest_client import RestClient
@@ -79,7 +81,7 @@ class User:
             # Take profit order
             #
             if opposite_open is False:
-                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 200))
+                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 300))
             else:
                 tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
 
@@ -96,12 +98,12 @@ class User:
             stop_loss_order = self.stop_loss_order
             if stop_loss_order is None and opp_tp_order is not None:
                 self.client.new_order(orderQty=curr_qty, ordType="Stop", execInst="LastPrice",
-                                          side=opposite.side, stopPx=opp_tp_order['price'] - sign)
+                                          side=opposite.side, stopPx=opp_tp_order['price'])
                 time.sleep(5)
             elif stop_loss_order is not None and opp_tp_order is not None:
-                if stop_loss_order['orderQty'] != curr_qty or stop_loss_order['stopPx'] != opp_tp_order['price'] - sign:
+                if stop_loss_order['orderQty'] != curr_qty or stop_loss_order['stopPx'] != opp_tp_order['price']:
                     self.client.amend_order(orderID=stop_loss_order['orderID'],
-                                            orderQty=curr_qty, stopPx=opp_tp_order['price'] - sign)
+                                            orderQty=curr_qty, stopPx=opp_tp_order['price'])
                     time.sleep(5)
 
         #
@@ -110,22 +112,22 @@ class User:
         next_order = self.next_stop_order
         if next_order is None and opposite_open is True and curr_qty < opp_qty and opposite.next_stop_order is None \
                 and opp_tp_order is not None:
-            if opp_tp_order['ordStatus'] == 'Filled':
-                return
-            if entry_price is None:
-                entry_price = int(opp_entry_price + (sign * opp_entry_price * data['swingPercent'] / 100))
-            if tp_order is None:
-                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
-            else:
-                tp_price = tp_order['price']
+            # if opp_tp_order['ordStatus'] == 'Filled':
+            #     return
+            # if entry_price is None:
+            #     entry_price = int(opp_entry_price + (sign * opp_entry_price * data['swingPercent'] / 100))
+            # if tp_order is None:
+            #     tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
+            # else:
+            #     tp_price = tp_order['price']
+            #
+            # losing_sum = opp_qty * abs((1/opp_entry_price) - (1/tp_price))
+            # for n in range(1, 10000):
+            #     gaining_sum = (opp_qty + n) * abs((1/entry_price) - (1/tp_price))
+            #     if gaining_sum - losing_sum > entry_price * data['swingPercent'] / 100:
+            #         break
 
-            losing_sum = opp_qty * abs(opp_entry_price - tp_price)
-            for n in range(1, 10000):
-                gaining_sum = (opp_qty + n) * abs(entry_price - tp_price)
-                if gaining_sum - losing_sum > entry_price * data['swingPercent'] / 100:
-                    break
-
-            qty = opp_qty + n - curr_qty
+            qty = math.ceil(opp_qty * data['qtyFactor']) - curr_qty
             if qty > 0:
                 stop_price = int(entry_price)
                 self.client.new_order(orderQty=qty, ordType="Stop",
@@ -172,6 +174,9 @@ while True:
         buy_user.close()
         sell_user.close()
         time.sleep(5)
+        if os.path.exists('STOP'):
+            log.info("Exiting on STOP signal.")
+            sys.exit(0)
         continue
 
     buy_user.update_orders()
