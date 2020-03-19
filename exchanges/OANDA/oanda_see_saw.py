@@ -109,24 +109,27 @@ def close_positions(instrument):
     return r.response
 
 
-# m_order = market_order("EUR_USD", 10)
-# m_price = float(m_order['orderFillTransaction']['price'])
-#
-# for n in range(1, 10):
-#     price = m_price + (n * 0.001)
-#     market_if_touched_order("EUR_USD", price, (n + 1) * 10)
-#     time.sleep(2)
-#
-# for n in range(1, 11):
-#     price = m_price - (n * 0.001)
-#     market_if_touched_order("EUR_USD", price, n * -10)
-#     time.sleep(2)
+def initial():
+    m_order = market_order("EUR_USD", 10)
+    m_price = float(m_order['orderFillTransaction']['price'])
 
+    for n in range(1, 10):
+        price = m_price + (n * 0.001)
+        market_if_touched_order("EUR_USD", price, (n + 1) * 10)
+        time.sleep(2)
+
+    for n in range(1, 11):
+        price = m_price - (n * 0.001)
+        market_if_touched_order("EUR_USD", price, n * -10)
+        time.sleep(2)
+
+
+initial()
 while True:
     result = get_positions()
     if result["EUR_USD"] > 100:
         close_positions("EUR_USD")
         o_orders = open_orders()
-        cancel_orders([o['id'] for o in o_orders])
-        break
+        cancel_orders([o['id'] for o in o_orders["EUR_USD"]])
+        initial()
     time.sleep(2)
