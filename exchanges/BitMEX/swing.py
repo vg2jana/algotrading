@@ -116,7 +116,7 @@ class User:
                 return
             if entry_price is None:
                 entry_price = int(opp_entry_price + (sign * opp_entry_price * data['swingPercent'] / 100))
-            
+
             # if tp_order is None:
             #     tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
             # else:
