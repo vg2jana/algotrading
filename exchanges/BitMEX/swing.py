@@ -117,17 +117,22 @@ class User:
             if entry_price is None:
                 entry_price = int(opp_entry_price + (sign * opp_entry_price * data['swingPercent'] / 100))
 
-            # if tp_order is None:
-            #     tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
-            # else:
-            #     tp_price = tp_order['price']
-            # losing_sum = opp_qty * abs((1/opp_entry_price) - (1/tp_price))
-            # for n in range(1, 10000):
-            #     gaining_sum = (opp_qty + n) * abs((1/entry_price) - (1/tp_price))
-            #     if gaining_sum - losing_sum > entry_price * data['swingPercent'] / 100:
-            #         break
+            qty = math.ceil(opp_qty * data['qtyFactor'])
+            if tp_order is None:
+                tp_price = int(entry_price + (sign * entry_price * data['profitPercent'] / 100))
+            else:
+                tp_price = tp_order['price']
+            losing_sum = opp_qty * abs((1/opp_entry_price) - (1/tp_price))
+            gaining_sum = qty * abs((1 / entry_price) - (1 / tp_price))
 
-            qty = math.ceil(opp_qty * data['qtyFactor']) - curr_qty
+            if abs(gaining_sum - losing_sum) > tp_price:
+                for n in range(1, 100000):
+                    gaining_sum = (opp_qty + n) * abs((1/entry_price) - (1/tp_price))
+                    if gaining_sum - losing_sum > tp_price:
+                        break
+                qty = opp_qty + n
+
+            qty -= curr_qty
             if qty > 0:
                 stop_price = int(entry_price)
                 self.client.new_order(orderQty=qty, ordType="Stop",
