@@ -195,6 +195,7 @@ while True:
         else:
             sell_user.client.new_order(ordType='Market', orderQty=data['startQty'], side=side)
         time.sleep(5)
+        continue
 
     buy_user.manage_orders(sell_user)
     sell_user.manage_orders(buy_user)
