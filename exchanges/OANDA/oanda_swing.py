@@ -251,6 +251,11 @@ while True:
             if long_units < symbol.l_units or short_units < symbol.s_units:
                 symbol.clean()
                 continue
+        else:
+            symbol.first_order = None
+            symbol.l_units = 0
+            symbol.s_units = 0
+            cancel_orders([o['id'] for o in o_orders.get(symbol.instrument, [])])
 
         symbol.run()
-    time.sleep(2)
+    time.sleep(0.5)
