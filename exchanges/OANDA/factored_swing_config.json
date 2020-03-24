@@ -1,0 +1,12 @@
+{
+    "symbols": {
+        "EUR_USD": {
+            "swing": 0.00020,
+            "startQty": 100,
+            "takeProfit": 0.00100,
+            "ratio": 1.5,
+            "maxProfit": 400,
+            "decimal": 5
+        }
+    }
+}

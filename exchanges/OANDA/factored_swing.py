@@ -218,7 +218,7 @@ class Symbol():
                     if (gaining_sum - losing_sum) * self.config['startQty'] > self.config['maxProfit']:
                         for n in range(opp_qty + 1, 1000000):
                             gaining_sum = n * self.config['takeProfit']
-                            if (gaining_sum - losing_sum) * (10 ** self.config['decimal']) > self.config['maxProfit']:
+                            if (gaining_sum - losing_sum) * self.config['startQty'] > self.config['maxProfit']:
                                 break
                         if units < 0:
                             units = (n - curr_qty) * -1
@@ -238,12 +238,14 @@ class Symbol():
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
                     filename='app.log')
 log = logging.getLogger()
-with open('config.json', 'r') as f:
+with open('key.json', 'r') as f:
+    key = json.load(f)
+with open('factored_swing_config.json', 'r') as f:
     params = json.load(f)
 
-token = params['global']['token']
+token = key['token']
 client = oandapyV20.API(access_token=token, environment="practice")
-account_id = params['global']['account_id']
+account_id = key['account_id']
 
 symbols = []
 o_positions = open_positions()

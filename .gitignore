@@ -3,6 +3,6 @@ __pycache__/
 .idea
 .DS_Store
 *.sqlite3
-*.json
+key.json
 *.txt
 *.log
