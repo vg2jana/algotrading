@@ -14,7 +14,7 @@ import sys
 from decimal import Decimal
 
 
-def market_order(instrument, units, tp_price=None, tp_pips=None):
+def market_order(instrument, units, tp_price=None, sl_price=None):
     data = {
         "order": {
             "timeInForce": "FOK",
@@ -27,8 +27,8 @@ def market_order(instrument, units, tp_price=None, tp_pips=None):
 
     if tp_price is not None:
         data["order"]["takeProfitOnFill"] = {"price": tp_price}
-    elif tp_pips is not None:
-        data["order"]["takeProfitOnFill"] = {"pips": str(int(tp_pips))}
+    if sl_price is not None:
+        data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
 
     r = orders.OrderCreate(accountID=account_id, data=data)
     client.request(r)
@@ -54,7 +54,7 @@ def limit_order(instrument, price, units):
     return r.response
 
 
-def market_if_touched_order(instrument, price, units, tp_price=None, tp_pips=None):
+def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None):
     data = {
         "order": {
             "price": "{0:.5f}".format(price),
@@ -68,8 +68,8 @@ def market_if_touched_order(instrument, price, units, tp_price=None, tp_pips=Non
 
     if tp_price is not None:
         data["order"]["takeProfitOnFill"] = {"price": "{0:.5f}".format(tp_price)}
-    elif tp_pips is not None:
-        data["order"]["takeProfitOnFill"] = {"pips": str(int(tp_pips))}
+    if sl_price is not None:
+        data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
 
     r = orders.OrderCreate(accountID=account_id, data=data)
     client.request(r)
@@ -77,14 +77,14 @@ def market_if_touched_order(instrument, price, units, tp_price=None, tp_pips=Non
     return r.response
 
 
-def amend_trade(tradeID, tp_price=None, tp_pips=None):
-    data = {"takeProfit": {}}
+def amend_trade(trade_id, tp_price=None, sl_price=None):
+    data = {}
     if tp_price is not None:
         data["takeProfit"] = {"price": "{0:.5f}".format(tp_price)}
-    elif tp_pips is not None:
-        data["takeProfit"] = {"distance": tp_pips}
+    if sl_price is not None:
+        data["stopLoss"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
 
-    r = trades.TradeCRCDO(account_id, tradeID, data)
+    r = trades.TradeCRCDO(account_id, trade_id, data)
     client.request(r)
 
     return r.response
@@ -182,7 +182,7 @@ class Symbol():
             self.first_order = market_order(self.instrument, self.config['startQty'])
             m_price = float(self.first_order['orderFillTransaction']['price'])
             tid = int(self.first_order['orderFillTransaction']['tradeOpened']['tradeID'])
-            amend_trade(tid, tp_price=m_price + self.config['takeProfit'] / 2)
+            amend_trade(tid, tp_price=m_price + self.config['takeProfit'] / 3)
             self.first_order["modified"] = False
             self.last_side = 'buy'
         else:
@@ -192,22 +192,45 @@ class Symbol():
             s_units = symbol.s_units
 
             if len(o_ord) == 0:
+                units = 0
                 if l_units < s_units and self.last_side == 'sell':
-                    units = int(s_units * self.config['ratio'] - l_units)
+                    opp_qty = s_units
+                    curr_qty = l_units
+                    qty = int(s_units * self.config['ratio'])
+                    units = qty - l_units
                     price = m_price
                     tp_price = m_price + self.config['takeProfit']
                     self.last_side = 'buy'
-                    market_if_touched_order(self.instrument, price, units, tp_price=tp_price)
+                    sl_price = m_price - self.config['takeProfit'] - self.config['swing']
                 elif s_units < l_units and self.last_side == 'buy':
-                    units = int(l_units * self.config['ratio'] - s_units) * -1
+                    opp_qty = l_units
+                    curr_qty = s_units
+                    qty = int(l_units * self.config['ratio'])
+                    units = (qty - s_units) * -1
                     price = m_price - self.config['swing']
-                    tp_price = m_price - self.config['takeProfit']
+                    tp_price = price - self.config['takeProfit']
                     self.last_side = 'sell'
-                    market_if_touched_order(self.instrument, price, units, tp_price=tp_price)
+                    sl_price = price + self.config['takeProfit'] + self.config['swing']
+
+                if units != 0:
+                    losing_sum = opp_qty * (self.config['takeProfit'] + self.config['swing'])
+                    gaining_sum = qty * self.config['takeProfit']
+                    if (gaining_sum - losing_sum) * self.config['startQty'] > self.config['maxProfit']:
+                        for n in range(opp_qty + 1, 1000000):
+                            gaining_sum = n * self.config['takeProfit']
+                            if (gaining_sum - losing_sum) * (10 ** self.config['decimal']) > self.config['maxProfit']:
+                                break
+                        if units < 0:
+                            units = (n - curr_qty) * -1
+                        else:
+                            units = n - curr_qty
+
+                    market_if_touched_order(self.instrument, price, units, tp_price=tp_price, sl_price=sl_price)
 
             if self.first_order["modified"] is False and s_units > 0:
                 tid = int(o_pos["long"]["tradeIDs"][0])
-                result = amend_trade(tid, tp_price=m_price + self.config['takeProfit'])
+                sl_price = m_price - self.config['takeProfit'] - self.config['swing']
+                result = amend_trade(tid, tp_price=m_price + self.config['takeProfit'], sl_price=sl_price)
                 if result.get("errorMessage", None) is None:
                     self.first_order["modified"] = True
 
