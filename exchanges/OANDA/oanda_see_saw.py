@@ -7,34 +7,39 @@ import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.trades as trades
 import pandas as pd
 import time
+import json
+import logging
+import os
+import sys
 from decimal import Decimal
 
 
-token = '83e8d0aafd0cb5570b32f08940871118-a21bed79d55fbd13dc3eef40d9e07a48'
-client = oandapyV20.API(access_token=token, environment="practice")
-account_id = "101-009-13015690-002"
-
-
-def market_order(instrument, units, positionFill='DEFAULT'):
+def market_order(instrument, units, tp_price=None, sl_price=None):
     data = {
         "order": {
             "timeInForce": "FOK",
             "instrument": str(instrument),
             "units": str(units),
             "type": "MARKET",
-            "positionFill": positionFill
+            "positionFill": "DEFAULT"
         }
     }
+
+    if tp_price is not None:
+        data["order"]["takeProfitOnFill"] = {"price": tp_price}
+    if sl_price is not None:
+        data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
+
     r = orders.OrderCreate(accountID=account_id, data=data)
     client.request(r)
 
     return r.response
 
 
-def limit_order(instrument, price, units):
+def limit_order(instrument, price, units, tp_price=None, sl_price=None):
     data = {
         "order": {
-            "price": price,
+            "price": "{0:.5f}".format(price),
             "timeInForce": "GTC",
             "instrument": instrument,
             "units": units,
@@ -43,13 +48,18 @@ def limit_order(instrument, price, units):
         }
     }
 
+    if tp_price is not None:
+        data["order"]["takeProfitOnFill"] = {"price": "{0:.5f}".format(tp_price)}
+    if sl_price is not None:
+        data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
+
     r = orders.OrderCreate(accountID=account_id, data=data)
     client.request(r)
 
     return r.response
 
 
-def market_if_touched_order(instrument, price, units):
+def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None):
     data = {
         "order": {
             "price": "{0:.5f}".format(price),
@@ -60,9 +70,26 @@ def market_if_touched_order(instrument, price, units):
             "positionFill": "DEFAULT"
         }
     }
-    del price
+
+    if tp_price is not None:
+        data["order"]["takeProfitOnFill"] = {"price": "{0:.5f}".format(tp_price)}
+    if sl_price is not None:
+        data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
 
     r = orders.OrderCreate(accountID=account_id, data=data)
+    client.request(r)
+
+    return r.response
+
+
+def amend_trade(trade_id, tp_price=None, sl_price=None):
+    data = {}
+    if tp_price is not None:
+        data["takeProfit"] = {"price": "{0:.5f}".format(tp_price)}
+    if sl_price is not None:
+        data["stopLoss"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
+
+    r = trades.TradeCRCDO(account_id, trade_id, data)
     client.request(r)
 
     return r.response
@@ -74,13 +101,23 @@ def cancel_orders(orderIDs):
         client.request(r)
 
 
+def open_trades():
+    result = {}
+    r = trades.OpenTrades(account_id)
+    client.request(r)
+
+    return r.response
+
+
 def open_orders():
     result = {}
     r = orders.OrdersPending(accountID=account_id)
     client.request(r)
 
     for o in r.response['orders']:
-        ins = o['instrument']
+        ins = o.get('instrument', None)
+        if ins is None:
+            continue
         if ins not in result:
             result[ins] = []
         result[ins].append(o)
@@ -88,48 +125,152 @@ def open_orders():
     return result
 
 
-def get_positions():
+def open_positions():
     result = {}
     r = positions.OpenPositions(accountID=account_id)
     client.request(r)
     for p in r.response['positions']:
-        result[p['instrument']] = float(p['unrealizedPL'])
+        result[p['instrument']] = p
 
     return result
 
 
 def close_positions(instrument):
+    temp = o_positions.get(instrument, {})
+    if len(temp) == 0:
+        return
+    l_units = abs(int(temp["long"]["units"]))
+    s_units = abs(int(temp["short"]["units"]))
+
     data = {
-        "longUnits": "ALL",
-        "shortUnits": "ALL"
+        "longUnits": str(l_units) if l_units > 0 else "NONE",
+        "shortUnits": str(s_units) if s_units > 0 else "NONE"
     }
     r = positions.PositionClose(account_id, instrument, data)
-    client.request(r)
-
-    return r.response
-
-
-def initial():
-    m_order = market_order("EUR_USD", 10)
-    m_price = float(m_order['orderFillTransaction']['price'])
-
-    for n in range(1, 10):
-        price = m_price + (n * 0.001)
-        market_if_touched_order("EUR_USD", price, (n + 1) * 10)
-        time.sleep(2)
-
-    for n in range(1, 11):
-        price = m_price - (n * 0.001)
-        market_if_touched_order("EUR_USD", price, n * -10)
-        time.sleep(2)
+    try:
+        client.request(r)
+    except oandapyV20.exceptions.V20Error as e:
+        log.warning(e)
+    else:
+        return r.response
 
 
-initial()
+class Symbol():
+    def __init__(self, instrument, config):
+        self.instrument = instrument
+        self.config = config
+        self.l_order = None
+        self.s_order = None
+        self.l_stop_order = None
+        self.s_stop_order = None
+        self.l_price = 0
+        self.s_price = 0
+        self.l_units = 0
+        self.s_units = 0
+
+    def clean(self):
+        # Cancel pending orders
+        cancel_orders([o['id'] for o in o_orders.get(self.instrument, [])])
+        # Close positions
+        close_positions(self.instrument)
+        # Clear first order reference
+        self.l_order = None
+        self.s_order = None
+        self.l_units = 0
+        self.s_units = 0
+        self.l_stop_order = None
+        self.s_stop_order = None
+
+    def run(self, o_pos, o_ord):
+        if len(o_pos) > 0:
+            self.l_units = abs(int(o_pos["long"]["units"]))
+            self.s_units = abs(int(o_pos["short"]["units"]))
+
+        l_exists = False
+        s_exists = False
+        for o in o_ord:
+            units = int(o['units'])
+            if o['type'] != 'LIMIT':
+                continue
+            if units > 0:
+                l_exists = True
+            elif units < 0:
+                s_exists = True
+
+        if len(o_pos) == 0 and self.l_order is None and self.s_order is None:
+            self.l_order = market_order(self.instrument, self.config['qty'])
+            self.s_order = market_order(self.instrument, self.config['qty'] * -1)
+            self.l_price = float(self.l_order['orderFillTransaction']['price'])
+            tid = int(self.l_order['orderFillTransaction']['tradeOpened']['tradeID'])
+            amend_trade(tid, tp_price=self.l_price + self.config['takeProfit'])
+            self.s_price = float(self.s_order['orderFillTransaction']['price'])
+            tid = int(self.s_order['orderFillTransaction']['tradeOpened']['tradeID'])
+            amend_trade(tid, tp_price=self.s_price - self.config['takeProfit'])
+            return
+
+        if l_exists is False and self.l_units == 0:
+            limit_order(self.instrument, self.l_price, self.config['qty'],
+                        tp_price=self.l_price + self.config['takeProfit'],
+                        sl_price=self.l_price - self.config['stopLoss'])
+
+        if s_exists is False and self.s_units == 0:
+            limit_order(self.instrument, self.s_price, self.config['qty'] * -1,
+                        tp_price=self.s_price - self.config['takeProfit'],
+                        sl_price=self.s_price + self.config['stopLoss'])
+
+        if self.l_stop_order is None:
+            self.l_stop_order = market_if_touched_order(self.instrument, self.l_price - self.config['stopLoss'],
+                                                        self.config['qty'] * -1)
+
+        if self.s_stop_order is None:
+            self.s_stop_order = market_if_touched_order(self.instrument, self.s_price + self.config['stopLoss'],
+                                                        self.config['qty'])
+
+
+logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
+                    filename='app.log')
+log = logging.getLogger()
+with open('key.json', 'r') as f:
+    key = json.load(f)
+with open('see_saw_config.json', 'r') as f:
+    params = json.load(f)
+
+token = key['token']
+client = oandapyV20.API(access_token=token, environment="practice")
+account_id = key['account_id']
+
+symbols = []
+o_positions = open_positions()
+o_orders = open_orders()
+for s, c in params["symbols"].items():
+    symbol = Symbol(s, c)
+    symbol.clean()
+    symbols.append(symbol)
+
+time.sleep(2)
+stop_signal = False
 while True:
-    result = get_positions()
-    if result["EUR_USD"] > 100:
-        close_positions("EUR_USD")
-        o_orders = open_orders()
-        cancel_orders([o['id'] for o in o_orders["EUR_USD"]])
-        initial()
-    time.sleep(2)
+    if os.path.exists('STOP'):
+        stop_signal = True
+
+    o_positions = open_positions()
+    o_orders = open_orders()
+
+    for symbol in symbols:
+        o_p = o_positions.get(symbol.instrument, {})
+        o_o = o_orders.get(symbol.instrument, {})
+        if stop_signal is True and len(o_p) == 0:
+            continue
+
+        cycle = False
+        if len(o_o) > 0:
+            stop_orders = [o for o in o_o if o['type'] == 'MARKET_IF_TOUCHED']
+            if len(stop_orders) != 2:
+                cycle = True
+
+        if cycle is True:
+            symbol.clean()
+
+        symbol.run(o_p, o_o)
+
+    time.sleep(0.5)
