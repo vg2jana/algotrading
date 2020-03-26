@@ -186,18 +186,18 @@ class Symbol():
             self.l_units = abs(int(o_pos["long"]["units"]))
             self.s_units = abs(int(o_pos["short"]["units"]))
 
-        l_exists = False
-        s_exists = False
+        l_order = None
+        s_order = None
         for o in o_ord:
             units = int(o['units'])
             if o['type'] != 'LIMIT':
                 continue
             if units > 0:
-                l_exists = True
+                l_order = o
             elif units < 0:
-                s_exists = True
+                s_order = o
 
-        if len(o_pos) == 0 and self.l_order is None and self.s_order is None:
+        if len(o_pos) == 0 and self.l_units == 0 and self.s_units == 0:
             self.l_order = market_order(self.instrument, self.config['qty'])
             self.s_order = market_order(self.instrument, self.config['qty'] * -1)
             self.l_price = float(self.l_order['orderFillTransaction']['price'])
@@ -208,12 +208,12 @@ class Symbol():
             amend_trade(tid, tp_price=self.s_price - self.config['takeProfit'])
             return
 
-        if l_exists is False and self.l_units == 0:
+        if l_order is None and self.l_units == 0:
             limit_order(self.instrument, self.l_price, self.config['qty'],
                         tp_price=self.l_price + self.config['takeProfit'],
                         sl_price=self.l_price - self.config['stopLoss'])
 
-        if s_exists is False and self.s_units == 0:
+        if s_order is None and self.s_units == 0:
             limit_order(self.instrument, self.s_price, self.config['qty'] * -1,
                         tp_price=self.s_price - self.config['takeProfit'],
                         sl_price=self.s_price + self.config['stopLoss'])
@@ -262,14 +262,10 @@ while True:
         if stop_signal is True and len(o_p) == 0:
             continue
 
-        cycle = False
-        if len(o_o) > 0:
-            stop_orders = [o for o in o_o if o['type'] == 'MARKET_IF_TOUCHED']
-            if len(stop_orders) != 2:
-                cycle = True
-
-        if cycle is True:
+        stop_orders = [o for o in o_o if o['type'] == 'MARKET_IF_TOUCHED']
+        if len(stop_orders) != 2:
             symbol.clean()
+            continue
 
         symbol.run(o_p, o_o)
 
