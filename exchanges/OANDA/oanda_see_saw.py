@@ -263,7 +263,7 @@ while True:
             continue
 
         stop_orders = [o for o in o_o if o['type'] == 'MARKET_IF_TOUCHED']
-        if len(stop_orders) != 2:
+        if len(o_p) > 0 and len(stop_orders) != 2:
             symbol.clean()
             continue
 
