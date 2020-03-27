@@ -67,7 +67,7 @@ def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=No
             "instrument": instrument,
             "units": units,
             "type": "MARKET_IF_TOUCHED",
-            "positionFill": "DEFAULT"
+            "positionFill": "REDUCE_ONLY"
         }
     }
 
@@ -90,6 +90,27 @@ def amend_trade(trade_id, tp_price=None, sl_price=None):
         data["stopLoss"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
 
     r = trades.TradeCRCDO(account_id, trade_id, data)
+    client.request(r)
+
+    return r.response
+
+
+def amend_order(order, price=None, units=None):
+    if price is None:
+        price = order['price']
+    if units is None:
+        units = order['units']
+    data = {
+        "order": {
+            "price": "{0:.5f}".format(price),
+            "units": units,
+            "type": order['type'],
+            "timeInForce": order['timeInForce'],
+            "instrument": order['instrument']
+        }
+    }
+
+    r = orders.OrderReplace(account_id, order['id'], data)
     client.request(r)
 
     return r.response
@@ -167,6 +188,7 @@ class Symbol():
         self.s_price = 0
         self.l_units = 0
         self.s_units = 0
+        self.limit_count = 0
 
     def clean(self):
         # Cancel pending orders
@@ -180,6 +202,7 @@ class Symbol():
         self.s_units = 0
         self.l_stop_order = None
         self.s_stop_order = None
+        self.limit_count = 0
 
     def run(self, o_pos, o_ord):
         if len(o_pos) > 0:
@@ -190,12 +213,16 @@ class Symbol():
         s_order = None
         for o in o_ord:
             units = int(o['units'])
-            if o['type'] != 'LIMIT':
-                continue
-            if units > 0:
-                l_order = o
-            elif units < 0:
-                s_order = o
+            if o['type'] == 'LIMIT':
+                if units > 0:
+                    l_order = o
+                elif units < 0:
+                    s_order = o
+            elif o['type'] == 'MARKET_IF_TOUCHED':
+                if units < 0:
+                    self.l_stop_order = o
+                elif units > 0:
+                    self.s_stop_order = o
 
         if len(o_pos) == 0 and self.l_units == 0 and self.s_units == 0:
             self.l_order = market_order(self.instrument, self.config['qty'])
@@ -210,21 +237,31 @@ class Symbol():
 
         if l_order is None and self.l_units == 0:
             limit_order(self.instrument, self.l_price, self.config['qty'],
-                        tp_price=self.l_price + self.config['takeProfit'],
-                        sl_price=self.l_price - self.config['stopLoss'])
+                        tp_price=self.l_price + self.config['takeProfit'])
+            self.limit_count += 1
 
         if s_order is None and self.s_units == 0:
             limit_order(self.instrument, self.s_price, self.config['qty'] * -1,
-                        tp_price=self.s_price - self.config['takeProfit'],
-                        sl_price=self.s_price + self.config['stopLoss'])
+                        tp_price=self.s_price - self.config['takeProfit'])
+            self.limit_count += 1
 
         if self.l_stop_order is None:
-            self.l_stop_order = market_if_touched_order(self.instrument, self.l_price - self.config['stopLoss'],
-                                                        self.config['qty'] * -1)
+            market_if_touched_order(self.instrument, self.l_price - self.config['stopLoss'],
+                                    self.config['qty'] * -1)
 
         if self.s_stop_order is None:
-            self.s_stop_order = market_if_touched_order(self.instrument, self.s_price + self.config['stopLoss'],
-                                                        self.config['qty'])
+            market_if_touched_order(self.instrument, self.s_price + self.config['stopLoss'],
+                                    self.config['qty'])
+
+        # if self.l_units == 0 and self.s_stop_order is not None:
+        #     sl_price = self.s_price + (self.config['takeProfit'] / 2)
+        #     if self.s_stop_order['price'] != "{0:.5f}".format(sl_price):
+        #         amend_order(self.s_stop_order, price=sl_price)
+        #
+        # if self.s_units == 0 and self.l_stop_order is not None:
+        #     sl_price = self.l_price - (self.config['takeProfit'] / 2)
+        #     if self.l_stop_order['price'] != "{0:.5f}".format(sl_price):
+        #         amend_order(self.l_stop_order, price=sl_price)
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
@@ -263,7 +300,7 @@ while True:
             continue
 
         stop_orders = [o for o in o_o if o['type'] == 'MARKET_IF_TOUCHED']
-        if len(o_p) > 0 and len(stop_orders) != 2:
+        if len(stop_orders) == 1 or symbol.limit_count >= 4:
             symbol.clean()
             continue
 
