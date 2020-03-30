@@ -59,7 +59,9 @@ def limit_order(instrument, price, units, tp_price=None, sl_price=None):
     return r.response
 
 
-def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None):
+def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None, my_id=None):
+    if my_id is None:
+        my_id = "0"
     data = {
         "order": {
             "price": "{0:.5f}".format(price),
@@ -67,7 +69,12 @@ def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=No
             "instrument": instrument,
             "units": units,
             "type": "MARKET_IF_TOUCHED",
-            "positionFill": "REDUCE_ONLY"
+            "positionFill": "REDUCE_ONLY",
+            "clientExtensions": {
+                "comment": "Test",
+                "tag": "strategy",
+                "id": my_id
+            }
         }
     }
 
@@ -182,10 +189,10 @@ class Symbol():
         self.config = config
         self.l_order = None
         self.s_order = None
+        self.l_tp_order = None
+        self.s_tp_order = None
         self.l_stop_order = None
         self.s_stop_order = None
-        self.l_price = 0
-        self.s_price = 0
         self.l_units = 0
         self.s_units = 0
         self.limit_count = 0
@@ -205,63 +212,70 @@ class Symbol():
         self.limit_count = 0
 
     def run(self, o_pos, o_ord):
+        l_price = None
+        s_price = None
         if len(o_pos) > 0:
             self.l_units = abs(int(o_pos["long"]["units"]))
             self.s_units = abs(int(o_pos["short"]["units"]))
+            if self.l_units != 0:
+                l_price = float(o_pos['long']['averagePrice'])
+            if self.s_units != 0:
+                s_price = float(o_pos['short']['averagePrice'])
 
-        l_order = None
-        s_order = None
+        l_tp_order = None
+        l_stop_order = None
+        s_tp_order = None
+        s_stop_order = None
         for o in o_ord:
             units = int(o['units'])
-            if o['type'] == 'LIMIT':
-                if units > 0:
-                    l_order = o
-                elif units < 0:
-                    s_order = o
-            elif o['type'] == 'MARKET_IF_TOUCHED':
-                if units < 0:
-                    self.l_stop_order = o
-                elif units > 0:
-                    self.s_stop_order = o
+            if o['type'] == 'MARKET_IF_TOUCHED':
+                if o.get('clientExtensions', None) is not None:
+                    type = o['clientExtensions']['id']
+                    if type == 'LONG_TAKE_PROFIT':
+                        l_tp_order = o
+                    elif type == 'LONG_STOP_LOSS':
+                        l_stop_order = o
+                    elif type == 'SHORT_TAKE_PROFIT':
+                        s_tp_order = o
+                    elif type == 'SHORT_STOP_LOSS':
+                        s_stop_order = o
 
         if len(o_pos) == 0 and self.l_units == 0 and self.s_units == 0:
-            self.l_order = market_order(self.instrument, self.config['qty'])
-            self.s_order = market_order(self.instrument, self.config['qty'] * -1)
-            self.l_price = float(self.l_order['orderFillTransaction']['price'])
-            tid = int(self.l_order['orderFillTransaction']['tradeOpened']['tradeID'])
-            amend_trade(tid, tp_price=self.l_price + self.config['takeProfit'])
-            self.s_price = float(self.s_order['orderFillTransaction']['price'])
-            tid = int(self.s_order['orderFillTransaction']['tradeOpened']['tradeID'])
-            amend_trade(tid, tp_price=self.s_price - self.config['takeProfit'])
+            market_order(self.instrument, self.config['qty'])
+            market_order(self.instrument, self.config['qty'] * -1)
             return
 
-        if l_order is None and self.l_units == 0:
-            limit_order(self.instrument, self.l_price, self.config['qty'],
-                        tp_price=self.l_price + self.config['takeProfit'])
-            self.limit_count += 1
+        if self.l_units > 0 and l_stop_order is None:
+            market_if_touched_order(self.instrument, l_price - self.config['stopLoss'],
+                                    self.config['qty'] * -1, my_id='LONG_STOP_LOSS')
 
-        if s_order is None and self.s_units == 0:
-            limit_order(self.instrument, self.s_price, self.config['qty'] * -1,
-                        tp_price=self.s_price - self.config['takeProfit'])
-            self.limit_count += 1
+        if self.l_units > 0 and l_tp_order is None:
+            market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
+                                    self.config['qty'] * -1, my_id='LONG_TAKE_PROFIT')
 
-        if self.l_stop_order is None:
-            market_if_touched_order(self.instrument, self.l_price - self.config['stopLoss'],
-                                    self.config['qty'] * -1)
+        if self.s_units > 0 and s_stop_order is None:
+            market_if_touched_order(self.instrument, s_price + self.config['stopLoss'],
+                                    self.config['qty'], my_id='SHORT_STOP_LOSS')
 
-        if self.s_stop_order is None:
-            market_if_touched_order(self.instrument, self.s_price + self.config['stopLoss'],
-                                    self.config['qty'])
+        if self.s_units > 0 and s_tp_order is None:
+            market_if_touched_order(self.instrument, s_price - self.config['takeProfit'],
+                                    self.config['qty'], my_id='SHORT_TAKE_PROFIT')
 
-        # if self.l_units == 0 and self.s_stop_order is not None:
-        #     sl_price = self.s_price + (self.config['takeProfit'] / 2)
-        #     if self.s_stop_order['price'] != "{0:.5f}".format(sl_price):
-        #         amend_order(self.s_stop_order, price=sl_price)
-        #
-        # if self.s_units == 0 and self.l_stop_order is not None:
-        #     sl_price = self.l_price - (self.config['takeProfit'] / 2)
-        #     if self.l_stop_order['price'] != "{0:.5f}".format(sl_price):
-        #         amend_order(self.l_stop_order, price=sl_price)
+        if self.l_units == 0:
+            if l_stop_order is not None:
+                cancel_orders([l_stop_order['id'],])
+            if s_tp_order is not None and s_price is not None:
+                tp_price = s_price + (self.config['takeProfit'] / 2)
+                if s_tp_order['price'] != "{0:.5f}".format(tp_price):
+                    amend_order(s_tp_order, price=tp_price)
+
+        if self.s_units == 0:
+            if s_stop_order is not None:
+                cancel_orders([s_stop_order['id'], ])
+            if l_tp_order is not None and l_price is not None:
+                tp_price = l_price - (self.config['takeProfit'] / 2)
+                if l_tp_order['price'] != "{0:.5f}".format(tp_price):
+                    amend_order(l_tp_order, price=tp_price)
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
@@ -296,13 +310,9 @@ while True:
     for symbol in symbols:
         o_p = o_positions.get(symbol.instrument, {})
         o_o = o_orders.get(symbol.instrument, {})
-        if stop_signal is True and len(o_p) == 0:
-            continue
 
-        stop_orders = [o for o in o_o if o['type'] == 'MARKET_IF_TOUCHED']
-        if len(stop_orders) == 1 or symbol.limit_count >= 4:
+        if len(o_p) == 0 and len(o_o) != 0:
             symbol.clean()
-            continue
 
         symbol.run(o_p, o_o)
 

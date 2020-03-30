@@ -1,9 +1,9 @@
 {
     "symbols": {
         "EUR_USD": {
-            "qty": 100,
-            "takeProfit": 0.00075,
-            "stopLoss": 0.00150,
+            "qty": 10000,
+            "takeProfit": 0.00030,
+            "stopLoss": 0.00090,
             "decimal": 5
         }
     }
