@@ -245,7 +245,7 @@ with open('factored_swing_config.json', 'r') as f:
 
 token = key['token']
 client = oandapyV20.API(access_token=token, environment="practice")
-account_id = key['account_id']
+account_id = "101-009-13015690-004"
 
 symbols = []
 o_positions = open_positions()
