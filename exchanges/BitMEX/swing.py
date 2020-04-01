@@ -181,7 +181,12 @@ while True:
         time.sleep(5)
         if os.path.exists('STOP'):
             log.info("Exiting on STOP signal.")
+            os.remove('STOP')
             sys.exit(0)
+        if os.path.exists('RELOAD'):
+            with open(config_file, 'r') as f:
+                data = json.load(f)
+            os.remove('RELOAD')
         continue
 
     buy_user.update_orders()

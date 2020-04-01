@@ -182,7 +182,7 @@ class Symbol():
             self.first_order = market_order(self.instrument, self.config['startQty'])
             m_price = float(self.first_order['orderFillTransaction']['price'])
             tid = int(self.first_order['orderFillTransaction']['tradeOpened']['tradeID'])
-            amend_trade(tid, tp_price=m_price + self.config['takeProfit'] / 3)
+            amend_trade(tid, tp_price=m_price + self.config['takeProfit'] / 4)
             self.first_order["modified"] = False
             self.last_side = 'buy'
         else:
