@@ -1,9 +1,17 @@
 {
     "symbols": {
         "EUR_USD": {
-            "swing": 0.00020,
+            "swing": 0.00200,
             "startQty": 100,
-            "takeProfit": 0.00100,
+            "takeProfit": 0.00800,
+            "ratio": 1.5,
+            "maxProfit": 400,
+            "decimal": 5
+        },
+        "GBP_USD": {
+            "swing": 0.00200,
+            "startQty": 100,
+            "takeProfit": 0.00800,
             "ratio": 1.5,
             "maxProfit": 400,
             "decimal": 5

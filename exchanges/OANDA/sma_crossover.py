@@ -135,7 +135,8 @@ for i in pairs:
 # Continuous execution        
 starttime=time.time()
 timeout = time.time() + 60*60*1  # 60 seconds times 60 meaning the script will run for 1 hr
-while time.time() <= timeout:
+# while time.time() <= timeout:
+while True:
     try:
         log.info("passthrough at %s" % time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
         main()

@@ -259,28 +259,32 @@ time.sleep(2)
 refresh_time = 2
 stop_signal = False
 while True:
-    if os.path.exists('STOP'):
-        stop_signal = True
+    try:
+        if os.path.exists('STOP'):
+            stop_signal = True
 
-    o_positions = open_positions()
-    o_orders = open_orders()
+        o_positions = open_positions()
+        o_orders = open_orders()
 
-    for symbol in symbols:
-        o_p = o_positions.get(symbol.instrument, {})
-        if stop_signal is True and len(o_p) == 0:
-            continue
-
-        if len(o_p) > 0:
-            long_units = abs(int(o_p["long"]["units"]))
-            short_units = abs(int(o_p["short"]["units"]))
-            if long_units < symbol.l_units or short_units < symbol.s_units:
-                symbol.clean()
+        for symbol in symbols:
+            o_p = o_positions.get(symbol.instrument, {})
+            if stop_signal is True and len(o_p) == 0:
                 continue
-        else:
-            symbol.first_order = None
-            symbol.l_units = 0
-            symbol.s_units = 0
-            cancel_orders([o['id'] for o in o_orders.get(symbol.instrument, [])])
 
-        symbol.run()
+            if len(o_p) > 0:
+                long_units = abs(int(o_p["long"]["units"]))
+                short_units = abs(int(o_p["short"]["units"]))
+                if long_units < symbol.l_units or short_units < symbol.s_units:
+                    symbol.clean()
+                    continue
+            else:
+                symbol.first_order = None
+                symbol.l_units = 0
+                symbol.s_units = 0
+                cancel_orders([o['id'] for o in o_orders.get(symbol.instrument, [])])
+
+            symbol.run()
+    except oandapyV20.exceptions.V20Error as e:
+        log.warning(e)
+        time.sleep(1)
     time.sleep(0.5)
