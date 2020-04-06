@@ -1,0 +1,123 @@
+{
+    "symbols": {
+        "EUR_USD": {
+            "qty": 10,
+            "stepSize": 0.00050,
+            "takeProfit": 0.00500
+        },
+
+        "EUR_JPY": {
+            "qty": 10,
+            "stepSize": 0.1,
+            "takeProfit": 1
+        },
+
+        "EUR_AUD": {
+            "qty": 10,
+            "stepSize": 0.00100,
+            "takeProfit": 0.01000
+        },
+
+        "AUD_USD": {
+            "qty": 10,
+            "stepSize": 0.00050,
+            "takeProfit": 0.00500
+        },
+
+        "AUD_CHF": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "AUD_NZD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "GBP_HKD": {
+            "qty": 10,
+            "stepSize": 0.01,
+            "takeProfit": 0.1
+        },
+
+        "GBP_USD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "GBP_NZD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "USD_JPY": {
+            "qty": 10,
+            "stepSize": 0.1,
+            "takeProfit": 1
+        },
+
+        "USD_CAD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "USD_INR": {
+            "qty": 10,
+            "stepSize": 0.05,
+            "takeProfit": 0.5
+        },
+
+        "USD_SGD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.1
+        },
+
+        "USD_HKD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.1
+        },
+
+        "NZD_USD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "NZD_JPY": {
+            "qty": 10,
+            "stepSize": 0.05,
+            "takeProfit": 0.5
+        },
+
+        "NZD_CAD": {
+            "qty": 10,
+            "stepSize": 0.001,
+            "takeProfit": 0.01
+        },
+
+        "SGD_JPY": {
+            "qty": 10,
+            "stepSize": 0.1,
+            "takeProfit": 1
+        },
+
+        "CAD_JPY": {
+            "qty": 10,
+            "stepSize": 0.1,
+            "takeProfit": 1
+        },
+
+        "HKD_JPY": {
+            "qty": 10,
+            "stepSize": 0.01,
+            "takeProfit": 0.1
+        }
+    }
+}

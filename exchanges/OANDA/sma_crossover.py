@@ -66,7 +66,7 @@ def ATR(DF,n):
     df['ATR'] = df['TR'].rolling(n).mean()
     #df['ATR'] = df['TR'].ewm(span=n,adjust=False,min_periods=n).mean()
     df2 = df.drop(['H-L','H-PC','L-PC'],axis=1)
-    return round(df2["ATR"][-1],2)
+    return df2["ATR"][-1]
 
 
 def trade_signal(df,curr):
