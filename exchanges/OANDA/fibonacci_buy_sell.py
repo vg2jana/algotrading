@@ -108,9 +108,11 @@ def amend_order(order, price=None, units=None):
         price = order['price']
     if units is None:
         units = order['units']
+    if type(price) != str:
+        price = "{0:.5f}".format(price)
     data = {
         "order": {
-            "price": "{0:.5f}".format(price),
+            "price": price,
             "units": units,
             "type": order['type'],
             "timeInForce": order['timeInForce'],
@@ -247,31 +249,42 @@ class Symbol():
                 market_order(self.instrument, self.config['qty'] * -1)
             return
 
-        if l_units > 0 or s_units > 0:
-            if l_units > 0 and len(l_orders) == 0:
-                units = l_units
-                order_price = l_price
-                for i in fib_series:
-                    order_price -= i * self.config['stepSize']
-                    limit_order(self.instrument, order_price, units)
-                    units *= 2
+        if l_units > 0 and len(l_orders) == 0:
+            units = l_units
+            order_price = l_price
+            for i in fib_series:
+                order_price -= i * self.config['stepSize']
+                limit_order(self.instrument, order_price, units)
+                units *= 2
 
+        if s_units > 0 and len(s_orders) == 0:
+            units = s_units
+            order_price = s_price
+            for i in fib_series:
+                order_price += i * self.config['stepSize']
+                limit_order(self.instrument, order_price, units * -1)
+                units *= 2
+
+        if l_tp_order is None or s_tp_order is None:
             if l_units > 0 and l_tp_order is None:
                 self.l_tp_order = market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
                                                           self.config['qty'] * -1, my_id=self.l_tp_text)
-
-            if s_units > 0 and len(s_orders) == 0:
-                units = s_units
-                order_price = s_price
-                for i in fib_series:
-                    order_price += i * self.config['stepSize']
-                    limit_order(self.instrument, order_price, units * -1)
-                    units *= 2
-
             if s_units > 0 and s_tp_order is None:
                 self.s_tp_order = market_if_touched_order(self.instrument, s_price - self.config['takeProfit'],
                                                           self.config['qty'], my_id=self.s_tp_text)
             return
+
+        if l_tp_order is not None:
+            tp_price = "{0:.5f}".format(l_price + self.config['takeProfit']).rstrip('0')
+            units = l_units * -1
+            if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
+                amend_order(l_tp_order, price=tp_price, units=units)
+
+        if s_tp_order is not None:
+            tp_price = "{0:.5f}".format(s_price - self.config['takeProfit']).rstrip('0')
+            units = s_units
+            if s_tp_order['price'].rstrip('0') != tp_price or s_tp_order['units'] != str(units):
+                amend_order(s_tp_order, price=tp_price, units=units)
 
         if self.l_tp_order is not None and l_tp_order is None:
             self.clean(side='long')
@@ -282,7 +295,7 @@ class Symbol():
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
-                    filename='app.log')
+                    filename='fibonacci_buy_sell.log')
 log = logging.getLogger()
 with open('key.json', 'r') as f:
     key = json.load(f)
@@ -317,6 +330,10 @@ while True:
             o_p = o_positions.get(symbol.instrument, {})
             o_o = o_orders.get(symbol.instrument, {})
             if stop_signal is True and len(o_p) == 0:
+                continue
+
+            if float(o_p.get('unrealizedPL', '0')) > params['minJPY']:
+                symbol.clean()
                 continue
 
             symbol.run(o_p, o_o)

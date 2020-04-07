@@ -196,6 +196,10 @@ class Symbol():
         self.l_stop_order = None
         self.s_stop_order = None
         self.limit_count = 0
+        self.l_tp_text = "%s_TAKE_PROFIT_LONG" % instrument
+        self.l_sl_text = "%s_STOP_LOSS_LONG" % instrument
+        self.s_tp_text = "%s_TAKE_PROFIT_SHORT" % instrument
+        self.s_sl_text = "%s_STOP_LOSS_SHORT" % instrument
 
     def clean(self):
         # Cancel pending orders
@@ -253,19 +257,19 @@ class Symbol():
 
         if l_units > 0 and l_stop_order is None:
             self.l_stop_order = market_if_touched_order(self.instrument, l_price - self.config['stopLoss'],
-                                    self.config['qty'] * -1, my_id='LONG_STOP_LOSS')
+                                    self.config['qty'] * -1, my_id=self.l_sl_text)
 
         if l_units > 0 and l_tp_order is None:
             self.l_tp_order = market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
-                                    self.config['qty'] * -1, my_id='LONG_TAKE_PROFIT')
+                                    self.config['qty'] * -1, my_id=self.l_tp_text)
 
         if s_units > 0 and s_stop_order is None:
             self.s_stop_order = market_if_touched_order(self.instrument, s_price + self.config['stopLoss'],
-                                    self.config['qty'], my_id='SHORT_STOP_LOSS')
+                                    self.config['qty'], my_id=self.s_sl_text)
 
         if s_units > 0 and s_tp_order is None:
             self.s_tp_order = market_if_touched_order(self.instrument, s_price - self.config['takeProfit'],
-                                    self.config['qty'], my_id='SHORT_TAKE_PROFIT')
+                                    self.config['qty'], my_id=self.s_tp_text)
 
         if l_order is None and s_order is None:
             units = 0
@@ -302,7 +306,7 @@ class Symbol():
             if s_units == 0:
                 tp_price = tp_price / 4
             if l_tp_order['price'] != "{0:.5f}".format(tp_price) or l_tp_order['units'] != str(l_units * -1):
-                amend_order(l_tp_order, price=l_tp_order, units=l_units * -1)
+                amend_order(l_tp_order, price=tp_price, units=l_units * -1)
 
             if s_stop_order is not None:
                 if s_stop_order['price'] != "{0:.5f}".format(tp_price) or s_stop_order['units'] != str(s_units):
