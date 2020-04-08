@@ -192,6 +192,8 @@ class Symbol():
         self.s_tp_order = None
         self.l_tp_text = "%s_TAKE_PROFIT_LONG" % instrument
         self.s_tp_text = "%s_TAKE_PROFIT_SHORT" % instrument
+        self.l_fib_index = 0
+        self.s_fib_index = 0
 
     def clean(self, side=None):
         # Cancel pending orders
@@ -207,8 +209,11 @@ class Symbol():
         # Clear first order reference
         if side in ('long', None):
             self.l_tp_order = None
+            self.l_fib_index = 0
         if side in ('short', None):
             self.s_tp_order = None
+            self.s_fib_index = 0
+
 
     def run(self, o_pos, o_ord):
         l_price = None
@@ -249,21 +254,17 @@ class Symbol():
                 market_order(self.instrument, self.config['qty'] * -1)
             return
 
-        if l_units > 0 and len(l_orders) == 0:
-            units = l_units
-            order_price = l_price
-            for i in fib_series:
-                order_price -= i * self.config['stepSize']
-                limit_order(self.instrument, order_price, units)
-                units *= 2
+        if l_units > 0 and len(l_orders) == 0 and self.l_fib_index < len(fib_series):
+            offset = sum(fib_series[:self.l_fib_index+1])
+            order_price = l_price - offset * self.config['stepSize']
+            limit_order(self.instrument, order_price, l_units)
+            self.l_fib_index += 1
 
-        if s_units > 0 and len(s_orders) == 0:
-            units = s_units
-            order_price = s_price
-            for i in fib_series:
-                order_price += i * self.config['stepSize']
-                limit_order(self.instrument, order_price, units * -1)
-                units *= 2
+        if s_units > 0 and len(s_orders) == 0 and self.s_fib_index < len(fib_series):
+            offset = sum(fib_series[:self.s_fib_index+1])
+            order_price = s_price + offset * self.config['stepSize']
+            limit_order(self.instrument, order_price, s_units * -1)
+            self.s_fib_index += 1
 
         if l_tp_order is None or s_tp_order is None:
             if l_units > 0 and l_tp_order is None:
@@ -325,6 +326,7 @@ while True:
 
         o_positions = open_positions()
         o_orders = open_orders()
+        unrealized_pnls = sum([float(pnl.get('unrealizedPL', '0')) for pnl in o_positions.values()])
 
         for symbol in symbols:
             o_p = o_positions.get(symbol.instrument, {})
@@ -332,7 +334,7 @@ while True:
             if stop_signal is True and len(o_p) == 0:
                 continue
 
-            if float(o_p.get('unrealizedPL', '0')) > params['minJPY']:
+            if unrealized_pnls > params['minJPY']:
                 symbol.clean()
                 continue
 

@@ -1,5 +1,5 @@
 {
-    "minJPY": 100,
+    "minJPY": 150,
     "symbols": {
         "EUR_USD": {
             "qty": 10,
