@@ -266,7 +266,7 @@ class Symbol():
             limit_order(self.instrument, order_price, s_units * -1)
             self.s_fib_index += 1
 
-        if l_tp_order is None or s_tp_order is None:
+        if self.l_tp_order is None or self.s_tp_order is None:
             if l_units > 0 and l_tp_order is None:
                 self.l_tp_order = market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
                                                           self.config['qty'] * -1, my_id=self.l_tp_text)
