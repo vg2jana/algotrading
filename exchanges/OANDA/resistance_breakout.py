@@ -195,7 +195,7 @@ while True:
             o_p = o_positions.get(p, {})
             log.info("passthrough at %s" % time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
             run(p, o_p)
-            time.sleep(300 - ((time.time() - starttime) % 300.0))  # 5 minute interval between each new execution
+        time.sleep(300 - ((time.time() - starttime) % 300.0))  # 5 minute interval between each new execution
     except KeyboardInterrupt:
         log.info('\n\nKeyboard exception received. Exiting.')
         exit()
