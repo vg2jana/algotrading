@@ -255,42 +255,55 @@ class Symbol():
             return
 
         if l_units > 0 and len(l_orders) == 0 and self.l_fib_index < len(fib_series):
-            offset = sum(fib_series[:self.l_fib_index+1])
-            order_price = l_price - offset * self.config['stepSize']
+            offset = sum(fib_series[:self.l_fib_index+1]) * self.config['stepSize']
+            order_price = l_price - offset
+            log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
+                                                                          l_units, self.l_fib_index))
             limit_order(self.instrument, order_price, l_units)
             self.l_fib_index += 1
 
         if s_units > 0 and len(s_orders) == 0 and self.s_fib_index < len(fib_series):
-            offset = sum(fib_series[:self.s_fib_index+1])
-            order_price = s_price + offset * self.config['stepSize']
+            offset = sum(fib_series[:self.s_fib_index+1]) * self.config['stepSize']
+            order_price = s_price + offset
+            log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
+                                                                          l_units, self.s_fib_index))
             limit_order(self.instrument, order_price, s_units * -1)
             self.s_fib_index += 1
 
         if self.l_tp_order is None or self.s_tp_order is None:
             if l_units > 0 and l_tp_order is None:
-                self.l_tp_order = market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
+                price = l_price + self.config['takeProfit']
+                log.info("%s: Submitting Long Take profit order, price: %s" % (self.instrument, price))
+                self.l_tp_order = market_if_touched_order(self.instrument, price,
                                                           self.config['qty'] * -1, my_id=self.l_tp_text)
             if s_units > 0 and s_tp_order is None:
-                self.s_tp_order = market_if_touched_order(self.instrument, s_price - self.config['takeProfit'],
+                price = s_price - self.config['takeProfit']
+                log.info("%s: Submitting Long Take profit order, price: %s" % (self.instrument, price))
+                self.s_tp_order = market_if_touched_order(self.instrument, price,
                                                           self.config['qty'], my_id=self.s_tp_text)
+                log.info("%s: Submitting Short Take profit order.")
             return
 
         if l_tp_order is not None:
             tp_price = "{0:.5f}".format(l_price + self.config['takeProfit']).rstrip('0')
             units = l_units * -1
             if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
+                log.info("%s: Amend Long TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
                 amend_order(l_tp_order, price=tp_price, units=units)
 
         if s_tp_order is not None:
             tp_price = "{0:.5f}".format(s_price - self.config['takeProfit']).rstrip('0')
             units = s_units
             if s_tp_order['price'].rstrip('0') != tp_price or s_tp_order['units'] != str(units):
+                log.info("%s: Amend Short TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
                 amend_order(s_tp_order, price=tp_price, units=units)
 
         if self.l_tp_order is not None and l_tp_order is None:
+            log.info("%s: Cleaning Long order and positions" % self.instrument)
             self.clean(side='long')
             return
         if self.s_tp_order is not None and s_tp_order is None:
+            log.info("%s: Cleaning Short order and positions" % self.instrument)
             self.clean(side='short')
             return
 
@@ -335,6 +348,7 @@ while True:
                 continue
 
             if unrealized_pnls > params['minJPY']:
+                log.info("%s: Cleaning all orders and positions" % symbol.instrument)
                 symbol.clean()
                 continue
 
