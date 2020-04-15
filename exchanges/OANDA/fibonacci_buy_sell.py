@@ -249,8 +249,10 @@ class Symbol():
 
         if l_units == 0 or s_units == 0 and stop_signal is False:
             if l_units == 0:
+                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
             if s_units == 0:
+                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
             return
 
@@ -266,7 +268,7 @@ class Symbol():
             offset = sum(fib_series[:self.s_fib_index+1]) * self.config['stepSize']
             order_price = s_price + offset
             log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
-                                                                          l_units, self.s_fib_index))
+                                                                          s_units, self.s_fib_index))
             limit_order(self.instrument, order_price, s_units * -1)
             self.s_fib_index += 1
 
