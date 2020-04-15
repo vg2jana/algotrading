@@ -132,6 +132,9 @@ class User:
                         break
                 qty = opp_qty + n
 
+            if qty >= data['maxQty']:
+                return "EXIT"
+
             qty -= curr_qty
             if qty > 0:
                 stop_price = int(entry_price)
@@ -202,7 +205,10 @@ while True:
         time.sleep(5)
         continue
 
-    buy_user.manage_orders(sell_user)
-    sell_user.manage_orders(buy_user)
+    if buy_user.manage_orders(sell_user) == "EXIT" or sell_user.manage_orders(buy_user) == "EXIT":
+        buy_user.close()
+        sell_user.close()
+        time.sleep(5)
+        continue
 
     time.sleep(5)

@@ -278,10 +278,9 @@ class Symbol():
                                                           self.config['qty'] * -1, my_id=self.l_tp_text)
             if s_units > 0 and s_tp_order is None:
                 price = s_price - self.config['takeProfit']
-                log.info("%s: Submitting Long Take profit order, price: %s" % (self.instrument, price))
+                log.info("%s: Submitting Short Take profit order, price: %s" % (self.instrument, price))
                 self.s_tp_order = market_if_touched_order(self.instrument, price,
                                                           self.config['qty'], my_id=self.s_tp_text)
-                log.info("%s: Submitting Short Take profit order.")
             return
 
         if l_tp_order is not None:

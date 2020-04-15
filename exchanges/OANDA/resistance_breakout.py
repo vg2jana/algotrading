@@ -161,10 +161,14 @@ def run(currency, o_pos):
         if l_units > 0 and ("CLOSE_BUY" in sig or "OPEN_SELL" in sig):
             log.info("Closing long position for %s" % currency)
             clean(currency)
+            if "OPEN_SELL" in sig:
+                market_order(currency, pos_size * -1)
             return
         if s_units > 0 and ("CLOSE_SELL" in sig or "OPEN_BUY" in sig):
             log.info("Closing short position for %s" % currency)
             clean(currency)
+            if "OPEN_BUY" in sig:
+                market_order(currency, pos_size)
             return
 
 
