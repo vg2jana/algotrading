@@ -198,9 +198,17 @@ class Symbol():
     def clean(self, side=None):
         # Cancel pending orders
         if side == 'long':
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if int(o['units']) > 0 and o['type'] == 'LIMIT']
+            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
+                            int(o['units']) > 0 and o['type'] == 'LIMIT']
+            tp_orders = ([o['id'] for o in o_orders.get(self.instrument, []) if
+                          int(o['units']) < 0 and o['type'] == 'MARKET_IF_TOUCHED'])
+            p_orders.extend(tp_orders)
         elif side == 'short':
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if int(o['units']) < 0 and o['type'] == 'LIMIT']
+            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
+                            int(o['units']) < 0 and o['type'] == 'LIMIT']
+            tp_orders = ([o['id'] for o in o_orders.get(self.instrument, []) if
+                          int(o['units']) > 0 and o['type'] == 'MARKET_IF_TOUCHED'])
+            p_orders.extend(tp_orders)
         else:
             p_orders = [o['id'] for o in o_orders.get(self.instrument, [])]
         cancel_orders(p_orders)
@@ -248,10 +256,10 @@ class Symbol():
                     s_orders.append(o)
 
         if l_units == 0 or s_units == 0 and stop_signal is False:
-            if l_units == 0:
+            if l_units == 0 and self.l_tp_order is None:
                 log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
-            if s_units == 0:
+            if s_units == 0 and self.s_tp_order is None:
                 log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
             return
@@ -286,14 +294,14 @@ class Symbol():
             return
 
         if l_tp_order is not None:
-            tp_price = "{0:.5f}".format(l_price + self.config['takeProfit']).rstrip('0')
+            tp_price = "{0:.5f}".format(l_price + self.config['takeProfit']).rstrip('0').rstrip('.')
             units = l_units * -1
             if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
                 log.info("%s: Amend Long TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
                 amend_order(l_tp_order, price=tp_price, units=units)
 
         if s_tp_order is not None:
-            tp_price = "{0:.5f}".format(s_price - self.config['takeProfit']).rstrip('0')
+            tp_price = "{0:.5f}".format(s_price - self.config['takeProfit']).rstrip('0').rstrip('.')
             units = s_units
             if s_tp_order['price'].rstrip('0') != tp_price or s_tp_order['units'] != str(units):
                 log.info("%s: Amend Short TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
