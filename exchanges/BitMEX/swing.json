@@ -1,0 +1,33 @@
+{
+    "swingPercent": 0.5,
+    "profitPercent": 2.5,
+    "symbol": "XBTUSD",
+    "startQty": 5,
+    "maxQty": 1000,
+    "qtyFactor": 1.5,
+    "testRun": false,
+
+    "test": {
+        "user1": {
+            "key": "UzlrFYMJJGo_A7QDihj3ZtY8",
+            "secret": "LuA5rSvqLGDghJ8A-6ZtDEgahvbIroqFPpRdKd-uI3DPSXQG"
+        },
+
+        "user2": {
+            "key": "WGYtfu3D6Yt9i7FZ-TfQguVt",
+            "secret": "2k31MREAOqMiFHAa55DBmpiTW9JfDjXZ52Ec1VRVk6SuE1Tl"
+        }
+    },
+
+    "prod": {
+        "user1": {
+        "key": "TuhaBxXEm6JJBR1e8Pnq0a-o",
+        "secret": "1MQ75FP5RcApq8Ydwhty-q5UzswqM-4b99fnXIwqm8V3aX52"
+        },
+
+        "user2": {
+            "key": "IwYUZC0RMRIMJRxGVmYYfasB",
+            "secret": "75Rev97WSUbQoaQtcsT5Gu2WnvGnm72tXP1FoI6XWsOtimEW"
+        }
+    }
+}
