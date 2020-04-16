@@ -23,7 +23,7 @@ def ATR(DF, n):
 
 
 def candles(instrument):
-    params = {"count": 800, "granularity": "M5"}
+    params = {"count": 800, "granularity": "M15"}
     candles = instruments.InstrumentsCandles(instrument=instrument, params=params)
     client.request(candles)
     ohlc_dict = candles.response["candles"]
@@ -199,7 +199,7 @@ while True:
             o_p = o_positions.get(p, {})
             log.info("passthrough at %s" % time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
             run(p, o_p)
-        time.sleep(300 - ((time.time() - starttime) % 300.0))  # 5 minute interval between each new execution
+        time.sleep(900 - ((time.time() - starttime) % 900.0))  # 15 minute interval between each new execution
     except KeyboardInterrupt:
         log.info('\n\nKeyboard exception received. Exiting.')
         exit()

@@ -10,7 +10,7 @@ import time
 import json
 import logging
 import os
-import sys
+import time
 from decimal import Decimal
 
 
@@ -39,7 +39,7 @@ def market_order(instrument, units, tp_price=None, sl_price=None):
 def limit_order(instrument, price, units):
     data = {
         "order": {
-            "price": price,
+            "price": "{0:.5f}".format(price),
             "timeInForce": "GTC",
             "instrument": instrument,
             "units": units,
@@ -56,7 +56,7 @@ def limit_order(instrument, price, units):
 
 def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None, my_id=None):
     if my_id is None:
-        my_id = "0"
+        my_id = str(time.time())
     data = {
         "order": {
             "price": "{0:.5f}".format(price),
@@ -193,13 +193,15 @@ class Symbol():
         self.s_order = None
         self.l_tp_order = None
         self.s_tp_order = None
-        self.l_stop_order = None
-        self.s_stop_order = None
+        # self.l_stop_order = None
+        # self.s_stop_order = None
         self.limit_count = 0
         self.l_tp_text = "%s_TAKE_PROFIT_LONG" % instrument
-        self.l_sl_text = "%s_STOP_LOSS_LONG" % instrument
+        self.l_order_text = "%s_LONG_ORDER" % instrument
+        # self.l_sl_text = "%s_STOP_LOSS_LONG" % instrument
         self.s_tp_text = "%s_TAKE_PROFIT_SHORT" % instrument
-        self.s_sl_text = "%s_STOP_LOSS_SHORT" % instrument
+        self.s_order_text = "%s_SHORT_ORDER" % instrument
+        # self.s_sl_text = "%s_STOP_LOSS_SHORT" % instrument
 
     def clean(self):
         # Cancel pending orders
@@ -207,11 +209,11 @@ class Symbol():
         # Close positions
         close_positions(self.instrument)
         # Clear first order reference
-        self.l_stop_order = None
-        self.s_stop_order = None
+        # self.l_stop_order = None
+        # self.s_stop_order = None
         self.l_tp_order = None
         self.s_tp_order = None
-        self.limit_count = 0
+        # self.limit_count = 0
 
     def run(self, o_pos, o_ord):
         l_price = None
@@ -226,52 +228,53 @@ class Symbol():
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
 
+            if float(o_pos['unrealizedPL']) > max(l_units, s_units) / 10:
+                log.info("%s: EXIT criteria satisfied" % self.instrument)
+                return "EXIT"
+
         l_tp_order = None
-        l_stop_order = None
+        # l_stop_order = None
         s_tp_order = None
-        s_stop_order = None
+        # s_stop_order = None
         l_order = None
         s_order = None
         for o in o_ord:
             if o['type'] == 'MARKET_IF_TOUCHED':
                 if o.get('clientExtensions', None) is not None:
-                    type = o['clientExtensions']['id']
-                    if type == 'LONG_TAKE_PROFIT':
+                    name = o['clientExtensions']['id']
+                    if name == self.l_tp_text:
                         l_tp_order = o
-                    elif type == 'LONG_STOP_LOSS':
-                        l_stop_order = o
-                    elif type == 'SHORT_TAKE_PROFIT':
+                    elif name == self.s_tp_text:
                         s_tp_order = o
-                    elif type == 'SHORT_STOP_LOSS':
-                        s_stop_order = o
-            elif o['type'] == 'LIMIT':
-                units = o.get('units', None)
-                if units > 0:
-                    l_order = o
-                elif units < 0:
-                    s_order = o
+                    elif name == self.l_order_text:
+                        l_order = o
+                    elif name == self.s_order_text:
+                        s_order = o
 
-        if len(o_pos) == 0 and l_units == 0:
+        if l_units == 0 and stop_signal is False and self.l_tp_order is None:
+            log.info("%s: Market order, Units: %s" % (self.instrument, self.config['startQty']))
             market_order(self.instrument, self.config['startQty'])
             return
 
-        if l_units > 0 and l_stop_order is None:
-            self.l_stop_order = market_if_touched_order(self.instrument, l_price - self.config['stopLoss'],
-                                    self.config['qty'] * -1, my_id=self.l_sl_text)
+        if (l_units > 0 and self.l_tp_order is None) or (s_units > 0 and self.s_tp_order is None):
+            if l_units > 0 and l_tp_order is None:
+                self.l_tp_order = market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
+                                        l_units * -1, my_id=self.l_tp_text)
 
-        if l_units > 0 and l_tp_order is None:
-            self.l_tp_order = market_if_touched_order(self.instrument, l_price + self.config['takeProfit'],
-                                    self.config['qty'] * -1, my_id=self.l_tp_text)
+            if s_units > 0 and s_tp_order is None:
+                self.s_tp_order = market_if_touched_order(self.instrument, s_price - self.config['takeProfit'],
+                                        s_units, my_id=self.s_tp_text)
+            return
 
-        if s_units > 0 and s_stop_order is None:
-            self.s_stop_order = market_if_touched_order(self.instrument, s_price + self.config['stopLoss'],
-                                    self.config['qty'], my_id=self.s_sl_text)
+        # if l_units > 0 and l_stop_order is None:
+        #     self.l_stop_order = market_if_touched_order(self.instrument, l_price - self.config['stopLoss'],
+        #                                                 self.config['qty'] * -1, my_id=self.l_sl_text)
+        #
+        # if s_units > 0 and s_stop_order is None:
+        #     self.s_stop_order = market_if_touched_order(self.instrument, s_price + self.config['stopLoss'],
+        #                                                 self.config['qty'], my_id=self.s_sl_text)
 
-        if s_units > 0 and s_tp_order is None:
-            self.s_tp_order = market_if_touched_order(self.instrument, s_price - self.config['takeProfit'],
-                                    self.config['qty'], my_id=self.s_tp_text)
-
-        if l_order is None and s_order is None:
+        if (l_units < s_units and l_order is None) or (s_units < l_units and s_order is None):
             units = 0
             if l_units < s_units:
                 opp_qty = s_units
@@ -279,12 +282,14 @@ class Symbol():
                 qty = int(s_units * self.config['ratio'])
                 units = qty - l_units
                 price = l_price
+                my_id = self.l_order_text
             elif s_units < l_units:
                 opp_qty = l_units
                 curr_qty = s_units
                 qty = int(l_units * self.config['ratio'])
                 units = (qty - s_units) * -1
                 price = l_price - self.config['swing']
+                my_id = self.s_order_text
 
             if units != 0:
                 losing_sum = opp_qty * (self.config['takeProfit'] + self.config['swing'])
@@ -299,29 +304,29 @@ class Symbol():
                     else:
                         units = n - curr_qty
 
-                limit_order(self.instrument, price, units)
+                market_if_touched_order(self.instrument, price, units, my_id=my_id)
 
         if l_tp_order is not None:
-            tp_price = l_price + self.config['takeProfit']
+            tp_price = self.config['takeProfit']
             if s_units == 0:
                 tp_price = tp_price / 4
+            tp_price += l_price
             if l_tp_order['price'] != "{0:.5f}".format(tp_price) or l_tp_order['units'] != str(l_units * -1):
                 amend_order(l_tp_order, price=tp_price, units=l_units * -1)
-
-            if s_stop_order is not None:
-                if s_stop_order['price'] != "{0:.5f}".format(tp_price) or s_stop_order['units'] != str(s_units):
-                    amend_order(s_stop_order, price=tp_price, units=s_units)
+            # if s_stop_order is not None:
+            #     if s_stop_order['price'] != "{0:.5f}".format(tp_price) or s_stop_order['units'] != str(s_units):
+            #         amend_order(s_stop_order, price=tp_price, units=s_units)
 
         if s_tp_order is not None:
-            tp_price = s_price - self.config['takeProfit']
-            if s_units == 0:
+            tp_price = self.config['takeProfit']
+            if l_units == 0:
                 tp_price = tp_price / 4
+            tp_price -= s_price
             if s_tp_order['price'] != "{0:.5f}".format(tp_price) or s_tp_order['units'] != str(s_units):
                 amend_order(s_tp_order, price=tp_price, units=s_units)
-
-            if l_stop_order is not None:
-                if l_stop_order['price'] != "{0:.5f}".format(tp_price) or l_stop_order['units'] != str(l_units * -1):
-                    amend_order(l_stop_order, price=tp_price, units=l_units * -1)
+            # if l_stop_order is not None:
+            #     if l_stop_order['price'] != "{0:.5f}".format(tp_price) or l_stop_order['units'] != str(l_units * -1):
+            #         amend_order(l_stop_order, price=tp_price, units=l_units * -1)
 
         if self.l_tp_order is not None and l_tp_order is None:
             self.clean()
@@ -332,7 +337,7 @@ class Symbol():
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
-                    filename='app.log')
+                    filename='factored_swing.log')
 log = logging.getLogger()
 with open('key.json', 'r') as f:
     key = json.load(f)
@@ -368,10 +373,9 @@ while True:
             if stop_signal is True and len(o_p) == 0:
                 continue
 
-            if len(o_p) == 0 and len(o_o) != 0:
+            if (len(o_p) == 0 and len(o_o) != 0) or symbol.run(o_p, o_o) == "EXIT":
                 symbol.clean()
 
-            symbol.run(o_p, o_o)
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     time.sleep(5)
