@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import time
+import requests
 from decimal import Decimal
 
 
@@ -189,8 +190,6 @@ class Symbol():
         l_units = 0
         s_units = 0
         self.last_side = None
-        self.l_order = None
-        self.s_order = None
         self.l_tp_order = None
         self.s_tp_order = None
         # self.l_stop_order = None
@@ -378,4 +377,15 @@ while True:
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
+    except requests.exceptions.ConnectionError as e:
+        log.warning(e)
+        while True:
+            log.info("Retrying...")
+            try:
+                client = oandapyV20.API(access_token=token, environment="practice")
+            except Exception as e:
+                log.warning(e)
+                time.sleep(60)
+            else:
+                break
     time.sleep(5)
