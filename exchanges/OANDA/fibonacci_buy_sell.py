@@ -10,6 +10,7 @@ import time
 import json
 import logging
 import os
+import requests
 import sys
 from decimal import Decimal
 
@@ -364,4 +365,15 @@ while True:
             symbol.run(o_p, o_o)
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
+    except requests.exceptions.ConnectionError as e:
+        log.warning(e)
+        while True:
+            log.info("Retrying...")
+            try:
+                client = oandapyV20.API(access_token=token, environment="practice")
+            except Exception as e:
+                log.warning(e)
+                time.sleep(60)
+            else:
+                break
     time.sleep(5)
