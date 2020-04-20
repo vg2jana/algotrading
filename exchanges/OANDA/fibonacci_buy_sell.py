@@ -357,10 +357,10 @@ while True:
             if stop_signal is True and len(o_p) == 0:
                 continue
 
-            if unrealized_pnls > params['minJPY']:
-                log.info("%s: Cleaning all orders and positions" % symbol.instrument)
-                symbol.clean()
-                continue
+            # if unrealized_pnls > params['minJPY']:
+            #     log.info("%s: Cleaning all orders and positions" % symbol.instrument)
+            #     symbol.clean()
+            #     continue
 
             symbol.run(o_p, o_o)
     except oandapyV20.exceptions.V20Error as e:
