@@ -55,7 +55,8 @@ def limit_order(instrument, price, units):
     return r.response
 
 
-def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None, my_id=None):
+def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=None,
+                            my_id=None, position_fill="REDUCE_ONLY"):
     if my_id is None:
         my_id = str(time.time())
     data = {
@@ -65,7 +66,7 @@ def market_if_touched_order(instrument, price, units, tp_price=None, sl_price=No
             "instrument": instrument,
             "units": units,
             "type": "MARKET_IF_TOUCHED",
-            "positionFill": "REDUCE_ONLY",
+            "positionFill": position_fill,
             "clientExtensions": {
                 "comment": "Test",
                 "tag": "strategy",
@@ -303,7 +304,7 @@ class Symbol():
                     else:
                         units = n - curr_qty
 
-                market_if_touched_order(self.instrument, price, units, my_id=my_id)
+                market_if_touched_order(self.instrument, price, units, my_id=my_id, position_fill="DEFAULT")
 
         if l_tp_order is not None:
             tp_price = self.config['takeProfit']
