@@ -195,6 +195,8 @@ class Symbol():
         self.s_tp_text = "%s_TAKE_PROFIT_SHORT" % instrument
         self.l_fib_index = 0
         self.s_fib_index = 0
+        self.l_pq = []
+        self.s_pq = []
 
     def clean(self, side=None):
         # Cancel pending orders
@@ -219,10 +221,11 @@ class Symbol():
         if side in ('long', None):
             self.l_tp_order = None
             self.l_fib_index = 0
+            self.l_pq = []
         if side in ('short', None):
             self.s_tp_order = None
             self.s_fib_index = 0
-
+            self.s_pq = []
 
     def run(self, o_pos, o_ord):
         l_price = None
@@ -260,26 +263,34 @@ class Symbol():
             if l_units == 0 and self.l_tp_order is None:
                 log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
+                self.l_pq.append([0, self.config['qty']])
             if s_units == 0 and self.s_tp_order is None:
                 log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
+                self.s_pq.append([0, self.config['qty']])
             return
 
         if l_units > 0 and len(l_orders) == 0 and self.l_fib_index < len(fib_series):
+            if self.l_pq[0][0] == 0:
+                self.l_pq[0][0] = l_price
             offset = sum(fib_series[:self.l_fib_index+1]) * self.config['stepSize']
             order_price = l_price - offset
             log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           l_units, self.l_fib_index))
             limit_order(self.instrument, order_price, l_units)
             self.l_fib_index += 1
+            self.l_pq.append([order_price, l_units])
 
         if s_units > 0 and len(s_orders) == 0 and self.s_fib_index < len(fib_series):
+            if self.s_pq[0][0] == 0:
+                self.s_pq[0][0] = s_price
             offset = sum(fib_series[:self.s_fib_index+1]) * self.config['stepSize']
             order_price = s_price + offset
             log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           s_units, self.s_fib_index))
             limit_order(self.instrument, order_price, s_units * -1)
             self.s_fib_index += 1
+            self.s_pq.append([order_price, s_units])
 
         if self.l_tp_order is None or self.s_tp_order is None:
             if l_units > 0 and l_tp_order is None:
@@ -295,14 +306,30 @@ class Symbol():
             return
 
         if l_tp_order is not None:
-            tp_price = "{0:.5f}".format(l_price + self.config['takeProfit']).rstrip('0').rstrip('.')
+            price = l_price + self.config['takeProfit']
+            if len(self.l_pq) > 2:
+                total_qty = 0
+                total_price = 0
+                for x in self.l_pq[:-2]:
+                    total_price += x[0] * x[1]
+                    total_qty += x[1]
+                price = total_price / total_qty
+            tp_price = "{0:.5f}".format(price).rstrip('0').rstrip('.')
             units = l_units * -1
             if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
                 log.info("%s: Amend Long TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
                 amend_order(l_tp_order, price=tp_price, units=units)
 
         if s_tp_order is not None:
-            tp_price = "{0:.5f}".format(s_price - self.config['takeProfit']).rstrip('0').rstrip('.')
+            price = s_price - self.config['takeProfit']
+            if len(self.s_pq) > 2:
+                total_qty = 0
+                total_price = 0
+                for x in self.s_pq[:-2]:
+                    total_price += x[0] * x[1]
+                    total_qty += x[1]
+                price = total_price / total_qty
+            tp_price = "{0:.5f}".format(price).rstrip('0').rstrip('.')
             units = s_units
             if s_tp_order['price'].rstrip('0') != tp_price or s_tp_order['units'] != str(units):
                 log.info("%s: Amend Short TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
@@ -319,7 +346,7 @@ class Symbol():
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
-                    filename='fibonacci_buy_sell.log')
+                    filename='fibonacci_avg_close.log')
 log = logging.getLogger()
 with open('key.json', 'r') as f:
     key = json.load(f)
@@ -328,12 +355,14 @@ with open('fibonacci_buy_sell.json', 'r') as f:
 
 token = key['token']
 client = oandapyV20.API(access_token=token, environment="practice")
-account_id = "101-009-13015690-005"
+account_id = "101-009-13015690-006"
 
 symbols = []
 o_positions = open_positions()
 o_orders = open_orders()
 for s, c in params["symbols"].items():
+    # if s not in ("EUR_USD", "GBP_USD"):
+    #     continue
     symbol = Symbol(s, c)
     symbol.clean()
     symbols.append(symbol)
@@ -356,11 +385,6 @@ while True:
             o_o = o_orders.get(symbol.instrument, {})
             if stop_signal is True and len(o_p) == 0:
                 continue
-
-            # if unrealized_pnls > params['minJPY']:
-            #     log.info("%s: Cleaning all orders and positions" % symbol.instrument)
-            #     symbol.clean()
-            #     continue
 
             symbol.run(o_p, o_o)
     except oandapyV20.exceptions.V20Error as e:
