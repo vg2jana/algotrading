@@ -1,11 +1,12 @@
 {
-    "swingPercent": 0.5,
-    "profitPercent": 2.5,
+    "step": 0.01,
     "symbol": "XBTUSD",
-    "startQty": 5,
-    "maxQty": 1000,
-    "qtyFactor": 1.5,
-    "testRun": false,
+    "startQty": {
+        "Buy": 5,
+        "Sell": 15
+    },
+    "qtyFactor": 2,
+    "testRun": true,
 
     "test": {
         "user1": {
