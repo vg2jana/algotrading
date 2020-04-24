@@ -185,14 +185,28 @@ def close_positions(instrument, side=None):
         return r.response
 
 
+def get_prices():
+    params = {"instruments": ",".join(symbol_list)}
+    r = pricing.PricingInfo(account_id, params=params)
+    try:
+        client.request(r)
+    except oandapyV20.exceptions.V20Error as e:
+        log.warning(e)
+
+    result = {}
+    for p in r.response['prices']:
+        result[p['instrument']] = {
+            'buy': float(p['closeoutAsk']),
+            'sell': float(p['closeoutBid'])
+        }
+
+    return result
+
+
 class Symbol():
     def __init__(self, instrument, config):
         self.instrument = instrument
         self.config = config
-        self.l_tp_order = None
-        self.s_tp_order = None
-        self.l_tp_text = "%s_TAKE_PROFIT_LONG" % instrument
-        self.s_tp_text = "%s_TAKE_PROFIT_SHORT" % instrument
         self.l_fib_index = 0
         self.s_fib_index = 0
 
@@ -201,15 +215,11 @@ class Symbol():
         if side == 'long':
             p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
                             int(o['units']) > 0 and o['type'] == 'LIMIT']
-            tp_orders = ([o['id'] for o in o_orders.get(self.instrument, []) if
-                          int(o['units']) < 0 and o['type'] == 'MARKET_IF_TOUCHED'])
-            p_orders.extend(tp_orders)
+            p_orders.extend(p_orders)
         elif side == 'short':
             p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
                             int(o['units']) < 0 and o['type'] == 'LIMIT']
-            tp_orders = ([o['id'] for o in o_orders.get(self.instrument, []) if
-                          int(o['units']) > 0 and o['type'] == 'MARKET_IF_TOUCHED'])
-            p_orders.extend(tp_orders)
+            p_orders.extend(p_orders)
         else:
             p_orders = [o['id'] for o in o_orders.get(self.instrument, [])]
         cancel_orders(p_orders)
@@ -217,14 +227,11 @@ class Symbol():
         close_positions(self.instrument, side=side)
         # Clear first order reference
         if side in ('long', None):
-            self.l_tp_order = None
             self.l_fib_index = 0
         if side in ('short', None):
-            self.s_tp_order = None
             self.s_fib_index = 0
 
-
-    def run(self, o_pos, o_ord):
+    def run(self, o_pos, o_ord, ltp):
         l_price = None
         s_price = None
         l_units = 0
@@ -237,30 +244,20 @@ class Symbol():
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
 
-        l_tp_order = None
-        s_tp_order = None
         l_orders = []
         s_orders = []
         for o in o_ord:
-            if o['type'] == 'MARKET_IF_TOUCHED':
-                if o.get('clientExtensions', None) is not None:
-                    type = o['clientExtensions']['id']
-                    if type == self.l_tp_text:
-                        l_tp_order = o
-                    elif type == self.s_tp_text:
-                        s_tp_order = o
-            elif o['type'] == 'LIMIT':
-                units = int(o.get('units', '0'))
-                if units > 0:
-                    l_orders.append(o)
-                elif units < 0:
-                    s_orders.append(o)
+            units = int(o.get('units', '0'))
+            if units > 0:
+                l_orders.append(o)
+            elif units < 0:
+                s_orders.append(o)
 
         if l_units == 0 or s_units == 0 and stop_signal is False:
-            if l_units == 0 and self.l_tp_order is None:
+            if l_units == 0:
                 log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
-            if s_units == 0 and self.s_tp_order is None:
+            if s_units == 0:
                 log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
             return
@@ -281,41 +278,19 @@ class Symbol():
             limit_order(self.instrument, order_price, s_units * -1)
             self.s_fib_index += 1
 
-        if self.l_tp_order is None or self.s_tp_order is None:
-            if l_units > 0 and l_tp_order is None:
-                price = l_price + self.config['takeProfit']
-                log.info("%s: Submitting Long Take profit order, price: %s" % (self.instrument, price))
-                self.l_tp_order = market_if_touched_order(self.instrument, price,
-                                                          self.config['qty'] * -1, my_id=self.l_tp_text)
-            if s_units > 0 and s_tp_order is None:
-                price = s_price - self.config['takeProfit']
-                log.info("%s: Submitting Short Take profit order, price: %s" % (self.instrument, price))
-                self.s_tp_order = market_if_touched_order(self.instrument, price,
-                                                          self.config['qty'], my_id=self.s_tp_text)
-            return
+        if l_units > 0:
+            tp_price = l_price + self.config['takeProfit']
+            if ltp['sell'] >= tp_price:
+                log.info("%s: Cleaning Long order and positions" % self.instrument)
+                self.clean(side='long')
+                return
 
-        if l_tp_order is not None:
-            tp_price = "{0:.5f}".format(l_price + self.config['takeProfit']).rstrip('0').rstrip('.')
-            units = l_units * -1
-            if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
-                log.info("%s: Amend Long TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
-                amend_order(l_tp_order, price=tp_price, units=units)
-
-        if s_tp_order is not None:
-            tp_price = "{0:.5f}".format(s_price - self.config['takeProfit']).rstrip('0').rstrip('.')
-            units = s_units
-            if s_tp_order['price'].rstrip('0') != tp_price or s_tp_order['units'] != str(units):
-                log.info("%s: Amend Short TP, Price: %s, Units: %s" % (self.instrument, tp_price, units))
-                amend_order(s_tp_order, price=tp_price, units=units)
-
-        if self.l_tp_order is not None and l_tp_order is None:
-            log.info("%s: Cleaning Long order and positions" % self.instrument)
-            self.clean(side='long')
-            return
-        if self.s_tp_order is not None and s_tp_order is None:
-            log.info("%s: Cleaning Short order and positions" % self.instrument)
-            self.clean(side='short')
-            return
+        if s_units > 0:
+            tp_price = s_price - self.config['takeProfit']
+            if ltp['buy'] <= tp_price:
+                log.info("%s: Cleaning Short order and positions" % self.instrument)
+                self.clean(side='short')
+                return
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
@@ -333,10 +308,12 @@ account_id = "101-009-13015690-005"
 symbols = []
 o_positions = open_positions()
 o_orders = open_orders()
+symbol_list = []
 for s, c in params["symbols"].items():
     symbol = Symbol(s, c)
     symbol.clean()
     symbols.append(symbol)
+    symbol_list.append(s)
 
 time.sleep(2)
 refresh_time = 2
@@ -349,7 +326,8 @@ while True:
 
         o_positions = open_positions()
         o_orders = open_orders()
-        unrealized_pnls = sum([float(pnl.get('unrealizedPL', '0')) for pnl in o_positions.values()])
+        prices = get_prices()
+        # unrealized_pnls = sum([float(pnl.get('unrealizedPL', '0')) for pnl in o_positions.values()])
 
         for symbol in symbols:
             o_p = o_positions.get(symbol.instrument, {})
@@ -362,7 +340,7 @@ while True:
             #     symbol.clean()
             #     continue
 
-            symbol.run(o_p, o_o)
+            symbol.run(o_p, o_o, prices[symbol.instrument])
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     except requests.exceptions.ConnectionError as e:
