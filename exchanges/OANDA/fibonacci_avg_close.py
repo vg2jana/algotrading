@@ -265,6 +265,7 @@ class Symbol():
                     log.info("%s LONG: Clearing pending orders" % self.instrument)
                     self.clean(side="long")
                     return
+                log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s LONG: Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.l_pq.append([0, self.config['qty']])
@@ -273,6 +274,7 @@ class Symbol():
                     log.info("%s SHORT: Clearing pending orders" % self.instrument)
                     self.clean(side="short")
                     return
+                log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s SHORT: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_pq.append([0, self.config['qty']])
@@ -283,6 +285,7 @@ class Symbol():
                 self.l_pq[0][0] = l_price
             offset = sum(fib_series[:self.l_fib_index+1]) * self.config['stepSize']
             order_price = l_price - offset
+            log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
             log.info("%s LONG: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           l_units, self.l_fib_index))
             limit_order(self.instrument, order_price, l_units)
@@ -294,6 +297,7 @@ class Symbol():
                 self.s_pq[0][0] = s_price
             offset = sum(fib_series[:self.s_fib_index+1]) * self.config['stepSize']
             order_price = s_price + offset
+            log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
             log.info("%s SHORT: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           s_units, self.s_fib_index))
             limit_order(self.instrument, order_price, s_units * -1)
@@ -304,11 +308,13 @@ class Symbol():
             if l_units > 0 and self.l_tp_order is None:
                 price = l_price + self.config['takeProfit']
                 units = self.config['qty'] * -1
+                log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s LONG: Take profit order, price: %s, units: %s" % (self.instrument, price, units))
                 self.l_tp_order = market_if_touched_order(self.instrument, price, units, my_id=self.l_tp_text)
             if s_units > 0 and self.s_tp_order is None:
                 price = s_price - self.config['takeProfit']
                 units = self.config['qty']
+                log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s SHORT: Take profit order, price: %s, units: %s" % (self.instrument, price, units))
                 self.s_tp_order = market_if_touched_order(self.instrument, price, units, my_id=self.s_tp_text)
             return
@@ -322,7 +328,9 @@ class Symbol():
                     total_price += x[0] * x[1]
                     total_qty += x[1]
                 price = total_price / total_qty
-            tp_price = "{0:.5f}".format(price).rstrip('0').rstrip('.')
+            # tp_price = "{0:.5f}".format(price).rstrip('0').rstrip('.')
+            price = str(price).split('.')
+            tp_price = "%s.%s" % (price[0], price[1][:self.config["precision"]])
             units = l_units * -1
             if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
                 log.info("%s LONG: Amend TP, Price: %s, units: %s" % (self.instrument, tp_price, units))
@@ -337,17 +345,22 @@ class Symbol():
                     total_price += x[0] * x[1]
                     total_qty += x[1]
                 price = total_price / total_qty
-            tp_price = "{0:.5f}".format(price).rstrip('0').rstrip('.')
+            # tp_price = "{0:.5f}".format(price).rstrip('0').rstrip('.')
+            price = str(price).split('.')
+            tp_price = "%s.%s" % (price[0], price[1][:self.config["precision"]])
             units = s_units
             if s_tp_order['price'].rstrip('0') != tp_price or s_tp_order['units'] != str(units):
+                log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s SHORT: Amend TP, Price: %s, units: %s" % (self.instrument, tp_price, units))
                 amend_order(s_tp_order, price=tp_price, units=units)
 
         if self.l_tp_order is not None and l_tp_order is None:
+            log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
             log.info("%s LONG: Close orders and position" % self.instrument)
             self.clean(side='long')
             return
         if self.s_tp_order is not None and s_tp_order is None:
+            log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
             log.info("%s SHORT: Close orders and position" % self.instrument)
             self.clean(side='short')
             return
