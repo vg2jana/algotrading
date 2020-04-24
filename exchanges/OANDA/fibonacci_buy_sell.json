@@ -96,7 +96,7 @@
             "qty": 30,
             "stepSize": 0.001,
             "takeProfit": 0.1,
-            "precision": 3
+            "precision": 5
         },
 
         "NZD_USD": {
