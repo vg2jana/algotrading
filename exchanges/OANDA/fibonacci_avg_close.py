@@ -22,7 +22,7 @@ def market_order(instrument, units, tp_price=None, sl_price=None):
             "instrument": str(instrument),
             "units": str(units),
             "type": "MARKET",
-            "positionFill": "DEFAULT"
+            "positionFill": "OPEN_ONLY"
         }
     }
 
@@ -259,12 +259,20 @@ class Symbol():
                 elif units < 0:
                     s_orders.append(o)
 
-        if l_units == 0 or s_units == 0 and stop_signal is False:
+        if (l_units == 0 or s_units == 0) and stop_signal is False:
             if l_units == 0 and self.l_tp_order is None:
+                if len(l_orders) != 0:
+                    log.info("%s LONG: Clearing pending orders" % self.instrument)
+                    self.clean(side="long")
+                    return
                 log.info("%s LONG: Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.l_pq.append([0, self.config['qty']])
             if s_units == 0 and self.s_tp_order is None:
+                if len(s_orders) != 0:
+                    log.info("%s SHORT: Clearing pending orders" % self.instrument)
+                    self.clean(side="short")
+                    return
                 log.info("%s SHORT: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_pq.append([0, self.config['qty']])
@@ -293,19 +301,19 @@ class Symbol():
             self.s_pq.append([order_price, s_units])
 
         if self.l_tp_order is None or self.s_tp_order is None:
-            if l_units > 0 and l_tp_order is None:
+            if l_units > 0 and self.l_tp_order is None:
                 price = l_price + self.config['takeProfit']
                 units = self.config['qty'] * -1
                 log.info("%s LONG: Take profit order, price: %s, units: %s" % (self.instrument, price, units))
                 self.l_tp_order = market_if_touched_order(self.instrument, price, units, my_id=self.l_tp_text)
-            if s_units > 0 and s_tp_order is None:
+            if s_units > 0 and self.s_tp_order is None:
                 price = s_price - self.config['takeProfit']
                 units = self.config['qty']
                 log.info("%s SHORT: Take profit order, price: %s, units: %s" % (self.instrument, price, units))
                 self.s_tp_order = market_if_touched_order(self.instrument, price, units, my_id=self.s_tp_text)
             return
 
-        if l_tp_order is not None:
+        if l_tp_order is not None and self.l_tp_order is not None:
             price = l_price + self.config['takeProfit']
             if len(self.l_pq) > 2:
                 total_qty = 0
@@ -320,7 +328,7 @@ class Symbol():
                 log.info("%s LONG: Amend TP, Price: %s, units: %s" % (self.instrument, tp_price, units))
                 amend_order(l_tp_order, price=tp_price, units=units)
 
-        if s_tp_order is not None:
+        if s_tp_order is not None and self.s_tp_order is not None:
             price = s_price - self.config['takeProfit']
             if len(self.s_pq) > 2:
                 total_qty = 0
@@ -378,7 +386,6 @@ while True:
 
         o_positions = open_positions()
         o_orders = open_orders()
-        unrealized_pnls = sum([float(pnl.get('unrealizedPL', '0')) for pnl in o_positions.values()])
 
         for symbol in symbols:
             o_p = o_positions.get(symbol.instrument, {})
