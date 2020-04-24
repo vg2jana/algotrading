@@ -333,6 +333,7 @@ class Symbol():
             tp_price = "%s.%s" % (price[0], price[1][:self.config["precision"]])
             units = l_units * -1
             if l_tp_order['price'].rstrip('0') != tp_price or l_tp_order['units'] != str(units):
+                log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s LONG: Amend TP, Price: %s, units: %s" % (self.instrument, tp_price, units))
                 amend_order(l_tp_order, price=tp_price, units=units)
 
