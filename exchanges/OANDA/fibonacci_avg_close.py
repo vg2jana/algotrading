@@ -189,7 +189,7 @@ def get_prices():
         log.warning(e)
 
     result = {}
-    for p in r.response['prices']:
+    for p in r.response.get('prices', {}):
         result[p['instrument']] = {
             'buy': float(p['closeoutAsk']),
             'sell': float(p['closeoutBid'])
@@ -306,7 +306,7 @@ class Symbol():
                     total_price += x[0] * x[1]
                     total_qty += x[1]
                 price = total_price / total_qty
-            if ltp['sell'] >= price:
+            if ltp is not None and ltp['sell'] >= price:
                 log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s LONG: Close orders and position" % self.instrument)
                 self.clean(side='long')
@@ -321,7 +321,7 @@ class Symbol():
                     total_price += x[0] * x[1]
                     total_qty += x[1]
                 price = total_price / total_qty
-            if ltp['buy'] <= price:
+            if ltp is not None and ltp['buy'] <= price:
                 log.info("\nPositions: %s\nOrders: %s" % (o_pos, o_ord))
                 log.info("%s SHORT: Close orders and position" % self.instrument)
                 self.clean(side='short')
@@ -371,7 +371,7 @@ while True:
             if stop_signal is True and len(o_p) == 0:
                 continue
 
-            symbol.run(o_p, o_o, prices[symbol.instrument])
+            symbol.run(o_p, o_o, prices.get(symbol.instrument, None))
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     except requests.exceptions.ConnectionError as e:
