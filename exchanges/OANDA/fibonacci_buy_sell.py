@@ -194,11 +194,12 @@ def get_prices():
         log.warning(e)
 
     result = {}
-    for p in r.response['prices']:
-        result[p['instrument']] = {
-            'buy': float(p['closeoutAsk']),
-            'sell': float(p['closeoutBid'])
-        }
+    if r.response is not None:
+        for p in r.response['prices']:
+            result[p['instrument']] = {
+                'buy': float(p['closeoutAsk']),
+                'sell': float(p['closeoutBid'])
+            }
 
     return result
 
@@ -280,14 +281,14 @@ class Symbol():
 
         if l_units > 0:
             tp_price = l_price + self.config['takeProfit']
-            if ltp['sell'] >= tp_price:
+            if ltp is not None and ltp['sell'] >= tp_price:
                 log.info("%s: Cleaning Long order and positions" % self.instrument)
                 self.clean(side='long')
                 return
 
         if s_units > 0:
             tp_price = s_price - self.config['takeProfit']
-            if ltp['buy'] <= tp_price:
+            if ltp is not None and ltp['buy'] <= tp_price:
                 log.info("%s: Cleaning Short order and positions" % self.instrument)
                 self.clean(side='short')
                 return
@@ -340,7 +341,7 @@ while True:
             #     symbol.clean()
             #     continue
 
-            symbol.run(o_p, o_o, prices[symbol.instrument])
+            symbol.run(o_p, o_o, prices.get(symbol.instrument, None))
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     except requests.exceptions.ConnectionError as e:

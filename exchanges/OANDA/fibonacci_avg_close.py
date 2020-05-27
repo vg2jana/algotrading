@@ -189,11 +189,12 @@ def get_prices():
         log.warning(e)
 
     result = {}
-    for p in r.response.get('prices', {}):
-        result[p['instrument']] = {
-            'buy': float(p['closeoutAsk']),
-            'sell': float(p['closeoutBid'])
-        }
+    if r.response is not None:
+        for p in r.response['prices']:
+            result[p['instrument']] = {
+                'buy': float(p['closeoutAsk']),
+                'sell': float(p['closeoutBid'])
+            }
 
     return result
 
