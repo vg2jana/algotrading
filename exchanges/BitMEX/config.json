@@ -2,10 +2,12 @@
     "step": 0.01,
     "symbol": "XBTUSD",
     "startQty": {
-        "Buy": 5,
-        "Sell": 15
+        "Buy": 10,
+        "Sell": 10
     },
-    "qtyFactor": 2,
+    "count": 5,
+    "qtyFactor": 1,
+    "percent": 0.5,
     "testRun": true,
 
     "test": {
@@ -15,8 +17,8 @@
         },
 
         "user2": {
-            "key": "WGYtfu3D6Yt9i7FZ-TfQguVt",
-            "secret": "2k31MREAOqMiFHAa55DBmpiTW9JfDjXZ52Ec1VRVk6SuE1Tl"
+            "key": "Aj08PgKAcrismIV-vOz8aMNl",
+            "secret": "yMeO9hBKUSwYexdIIdTiXPCfA-4nCuuG8AotnuObtJuFamu8"
         }
     },
 
