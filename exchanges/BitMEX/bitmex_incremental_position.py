@@ -34,8 +34,8 @@ class User:
     def time_to_close(self):
         close = False
         if self.take_profit_order is not None:
-            o = self.client.get_orders(filter='{"orderID": "%s"}' % self.take_profit_order['orderID'])
-            if o is not None and o['ordStatus'] == 'Filled':
+            # o = self.client.get_orders(filter='{"orderID": "%s"}' % self.take_profit_order['orderID'])
+            if self.take_profit_order['ordStatus'] == 'Filled':
                 close = True
 
         return close
@@ -58,10 +58,6 @@ class User:
         for o in orders:
             if o['side'] == self.side:
                 stop_orders.append(o)
-            else:
-                self.take_profit_order = o
-
-        tp_order = self.take_profit_order
 
         curr_open = False
         entry_price = None
@@ -91,9 +87,21 @@ class User:
             side = 'Sell' if self.side == 'Buy' else 'Buy'
 
             if self.take_profit_order is None:
-                self.client.new_order(orderQty=curr_qty, ordType="Stop", side=side,
-                                      pegPriceType='TrailingStopPeg', pegOffsetValue=offset)
-            elif (tp_order['orderQty'] != curr_qty) or (int(tp_order['pegOffsetValue']) != offset):
+                self.take_profit_order = self.client.new_order(orderQty=curr_qty, ordType="Stop", side=side,
+                                                               pegPriceType='TrailingStopPeg', pegOffsetValue=offset)
+                return
+            else:
+                response, order = self.client.get_orders(filter='{"orderID": "%s"}' % self.take_profit_order['orderID'])
+                if response.status_code == 200 and order is None:
+                    self.take_profit_order = None
+                elif response.status_code != 200:
+                    pass
+                else:
+                    self.take_profit_order = order
+
+            tp_order = self.take_profit_order
+            if tp_order is not None and \
+                    (tp_order['orderQty'] != curr_qty) or (int(tp_order['pegOffsetValue']) != offset):
                 self.client.amend_order(orderID=tp_order['orderID'], orderQty=curr_qty, pegOffsetValue=offset)
                 time.sleep(5)
 

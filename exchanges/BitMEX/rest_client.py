@@ -107,6 +107,7 @@ class RestClient:
     def get_orders(self, **kwargs):
 
         order = None
+        response = None
 
         try:
             order, response = self.api.Order.Order_getOrders(**kwargs).result()
@@ -124,7 +125,10 @@ class RestClient:
         if order is not None and len(order) > 0:
             order = order[0]
 
-        return order
+        if len(order) == 0:
+            order = None
+
+        return response, order
 
     def open_orders(self):
 
