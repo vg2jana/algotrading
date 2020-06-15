@@ -143,12 +143,12 @@ while True:
 
     if buy_user.time_to_close() is True:
         buy_user.close()
-        if len(buy_position) <= 1:
+        if len(buy_orders) <= 1:
             sell_user.close()
         time.sleep(5)
     elif sell_user.time_to_close() is True:
         sell_user.close()
-        if len(sell_position) <= 1:
+        if len(sell_orders) <= 1:
             buy_user.close()
         time.sleep(5)
 
