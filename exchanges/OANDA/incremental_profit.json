@@ -2,24 +2,27 @@
     "symbols": {
 
         "GBP_USD": {
-            "qty": 10,
+            "qty": 1000,
             "first_step": 0.01,
             "stepSize": 0.001,
-            "precision": 5
+            "precision": 5,
+            "maxUnits": 15000
         },
 
         "GBP_NZD": {
-            "qty": 10,
+            "qty": 1000,
             "first_step": 0.01,
             "stepSize": 0.001,
-            "precision": 5
+            "precision": 5,
+            "maxUnits": 15000
         },
 
         "NZD_JPY": {
-            "qty": 10,
+            "qty": 1000,
             "first_step": 1,
             "stepSize": 0.1,
-            "precision": 5
+            "precision": 5,
+            "maxUnits": 15000
         }
     }
 }

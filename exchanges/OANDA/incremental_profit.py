@@ -216,11 +216,11 @@ class Symbol():
         # Cancel pending orders
         if side == 'long':
             p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
-                            int(o['units']) > 0 and o['type'] == 'LIMIT']
+                        int(o['units']) > 0 and o['type'] == 'LIMIT']
             p_orders.extend(p_orders)
         elif side == 'short':
             p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
-                            int(o['units']) < 0 and o['type'] == 'LIMIT']
+                        int(o['units']) < 0 and o['type'] == 'LIMIT']
             p_orders.extend(p_orders)
         else:
             p_orders = [o['id'] for o in o_orders.get(self.instrument, [])]
@@ -229,9 +229,9 @@ class Symbol():
         close_positions(self.instrument, side=side)
         # Clear first order reference
         if side in ('long', None):
-            self.l_fib_index = 0
+            self.l_last_price = 0
         if side in ('short', None):
-            self.s_fib_index = 0
+            self.s_last_price = 0
 
     def run(self, o_pos, o_ord, ltp):
         l_price = None
@@ -243,12 +243,8 @@ class Symbol():
             s_units = abs(int(o_pos["short"]["units"]))
             if l_units != 0:
                 l_price = float(o_pos['long']['averagePrice'])
-                if self.l_last_price is None:
-                    self.l_last_price = l_price
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
-                if self.s_last_price is None:
-                    self.s_last_price = s_price
 
         l_orders = []
         s_orders = []
@@ -270,7 +266,7 @@ class Symbol():
 
         if l_units > 0 and len(l_orders) <= self.max_open_orders:
             count = len(l_orders)
-            while count <= self.max_open_orders:
+            while count <= self.max_open_orders and self.config["maxUnits"] >= l_units + (count * self.config['qty']):
                 if self.l_last_price == 0:
                     l_order_price = l_price + self.config['first_step']
                 else:
@@ -282,7 +278,7 @@ class Symbol():
 
         if s_units > 0 and len(s_orders) <= self.max_open_orders:
             count = len(s_orders)
-            while count <= self.max_open_orders:
+            while count <= self.max_open_orders and self.config["maxUnits"] >= s_units + (count * self.config['qty']):
                 if self.s_last_price == 0:
                     s_order_price = s_price - self.config['first_step']
                 else:
@@ -294,11 +290,12 @@ class Symbol():
 
         if l_units > 0:
             tp_price = (l_price + self.l_last_price - (self.max_open_orders * self.config['stepSize'])) / 2
-            if ltp is not None and ltp['sell'] >= tp_price:
+            if ltp is not None and (ltp['sell'] >= tp_price or l_units >= self.config["maxUnits"]):
                 log.info("%s: Cleaning Long order and positions" % self.instrument)
-                log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (self.instrument, l_units, l_price, tp_price))
+                log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (
+                    self.instrument, l_units, l_price, tp_price))
                 self.clean(side='long')
-                if l_units >= 5 * self.config['qty']:
+                if l_units >= 7 * self.config['qty']:
                     log.info("%s: Cleaning Short order and positions" % self.instrument)
                     log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
                         self.instrument, s_units, s_price, ltp['buy']))
@@ -307,11 +304,12 @@ class Symbol():
 
         if s_units > 0:
             tp_price = (s_price - self.s_last_price + (self.max_open_orders * self.config['stepSize'])) / 2
-            if ltp is not None and ltp['buy'] <= tp_price:
+            if ltp is not None and (ltp['buy'] <= tp_price or s_units >= self.config["maxUnits"]):
                 log.info("%s: Cleaning Short order and positions" % self.instrument)
-                log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (self.instrument, s_units, s_price, tp_price))
+                log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
+                    self.instrument, s_units, s_price, tp_price))
                 self.clean(side='sell')
-                if s_units >= 5 * self.config['qty']:
+                if s_units >= 7 * self.config['qty']:
                     log.info("%s: Cleaning Long order and positions" % self.instrument)
                     log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (
                         self.instrument, l_units, l_price, ltp['sell']))
