@@ -215,12 +215,10 @@ class Symbol():
     def clean(self, side=None):
         # Cancel pending orders
         if side == 'long':
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
-                        int(o['units']) > 0 and o['type'] == 'LIMIT']
+            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if int(o['units']) > 0]
             p_orders.extend(p_orders)
         elif side == 'short':
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
-                        int(o['units']) < 0 and o['type'] == 'LIMIT']
+            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if int(o['units']) < 0]
             p_orders.extend(p_orders)
         else:
             p_orders = [o['id'] for o in o_orders.get(self.instrument, [])]
