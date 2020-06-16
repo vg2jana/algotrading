@@ -38,6 +38,9 @@ class User:
             if self.take_profit_order['ordStatus'] == 'Filled':
                 close = True
 
+        log.info("Side: %s, Close signal: %s" % (self.side, close))
+        log.info("Take profit order:\n%s" % self.take_profit_order)
+
         return close
 
     def close(self):
@@ -53,8 +56,6 @@ class User:
 
     def manage_orders(self, position, orders):
         stop_orders = []
-        sign = 1 if self.side == 'Buy' else -1
-
         for o in orders:
             if o['side'] == self.side:
                 stop_orders.append(o)
@@ -70,14 +71,17 @@ class User:
         if curr_open is True and len(self.order_menu) == 0:
             self.order_menu = order_menu(entry_price, curr_qty, config['percent'], self.side,
                                          ratio=config['qtyFactor'], count=config['count'])
+            log.info("Order menu:\n%s" % self.order_menu)
             for o in self.order_menu:
                 price, qty = o
                 order = self.client.new_order(orderQty=qty, ordType="Stop", side=self.side,
                                               stopPx=price, execInst='LastPrice')
+                log.info("Stop order new:\n%s" % order)
                 while order is None or order.get('ordStatus', None) != 'New':
                     time.sleep(5)
                     order = self.client.new_order(orderQty=qty, ordType="Stop", side=self.side,
                                                   stopPx=price, execInst='LastPrice')
+                    log.info("Retrying Stop order new:\n%s" % order)
                 time.sleep(1)
 
         if curr_qty > config['startQty'][self.side]:
@@ -99,6 +103,7 @@ class User:
                 else:
                     self.take_profit_order = order
 
+            log.info("Take profit order:\n%s" % self.take_profit_order)
             tp_order = self.take_profit_order
             if tp_order is not None and \
                     (tp_order['orderQty'] != curr_qty) or (int(tp_order['pegOffsetValue']) != offset):
@@ -150,15 +155,21 @@ while True:
         stop_signal = False
 
     if buy_user.time_to_close() is True:
+        log.info("Closing Buy position")
         buy_user.close()
         if len(buy_orders) <= 1:
+            log.info("Closing Sell position due to overBuy.")
             sell_user.close()
         time.sleep(5)
+        continue
     elif sell_user.time_to_close() is True:
+        log.info("Closing Sell position")
         sell_user.close()
         if len(sell_orders) <= 1:
+            log.info("Closing Buy position due to overSell.")
             buy_user.close()
         time.sleep(5)
+        continue
 
     if stop_signal is False and ((len(buy_position) == 0 or buy_position['isOpen'] is False) or (
             len(sell_position) == 0 or sell_position['isOpen'] is False)):

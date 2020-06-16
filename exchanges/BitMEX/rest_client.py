@@ -31,6 +31,7 @@ class RestClient:
 
         try:
             order, response = self.api.Order.Order_new(**kwargs).result()
+            self.logger.info("New order:\n%s\n\nResponse:\n%s" % (order, response))
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Failed to place order with params: {}".format(kwargs))
@@ -51,6 +52,7 @@ class RestClient:
 
         try:
             order, response = self.api.Order.Order_amend(**kwargs).result()
+            self.logger.info("Amend order:\n%s\n\nResponse:\n%s" % (order, response))
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Failed to amend order with params: {}".format(kwargs))
@@ -92,6 +94,7 @@ class RestClient:
 
         try:
             orders, response = self.api.Order.Order_cancelAll(**kwargs).result()
+            self.logger.info("Orders:\n%s\n\nResponse:\n%s" % (orders, response))
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Failed to cancel all orders")
@@ -218,6 +221,7 @@ class RestClient:
 
         try:
             position, response = self.api.Order.Order_closePosition(symbol=self.symbol).result()
+            self.logger.info("Position:\n%s\n\nResponse:\n%s" % (position, response))
         except Exception as e:
             self.logger.warning(e)
             self.logger.warning("Failed to close open position")
