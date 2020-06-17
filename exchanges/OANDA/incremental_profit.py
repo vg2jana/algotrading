@@ -270,8 +270,8 @@ class Symbol():
                 else:
                     l_order_price = self.l_last_price + self.config['stepSize']
                 log.info("%s: Long Entry price: %s" % (self.instrument, l_price))
-                log.info("%s: Price: %s, Units: %s" % (self.instrument, l_order_price, l_units))
-                market_if_touched_order(self.instrument, l_order_price, l_units)
+                log.info("%s: Price: %s, Units: %s" % (self.instrument, l_order_price, self.config['qty']))
+                market_if_touched_order(self.instrument, l_order_price, self.config['qty'])
                 self.l_last_price = l_order_price
                 count += 1
 
@@ -283,8 +283,8 @@ class Symbol():
                 else:
                     s_order_price = self.s_last_price - self.config['stepSize']
                 log.info("%s: Short Entry price: %s" % (self.instrument, s_price))
-                log.info("%s: Price: %s, Units: %s" % (self.instrument, s_order_price, s_units * -1))
-                market_if_touched_order(self.instrument, s_order_price, s_units * -1)
+                log.info("%s: Price: %s, Units: %s" % (self.instrument, s_order_price, self.config['qty'] * -1))
+                market_if_touched_order(self.instrument, s_order_price, self.config['qty'] * -1)
                 self.s_last_price = s_order_price
                 count += 1
 
