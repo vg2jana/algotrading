@@ -303,7 +303,7 @@ class Symbol():
                 return
 
         if s_units > 0:
-            tp_price = (s_price - self.s_last_price + (self.max_open_orders * self.config['stepSize'])) / 2
+            tp_price = (s_price + self.s_last_price + (self.max_open_orders * self.config['stepSize'])) / 2
             if ltp is not None and (ltp['buy'] <= tp_price or s_units >= self.config["maxUnits"]):
                 log.info("%s: Cleaning Short order and positions" % self.instrument)
                 log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
