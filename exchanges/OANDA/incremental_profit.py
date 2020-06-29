@@ -299,7 +299,7 @@ class Symbol():
                     log.info("%s: Cleaning Short order and positions" % self.instrument)
                     log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
                         self.instrument, s_units, s_price, ltp['buy']))
-                    self.clean(side='sell')
+                    self.clean(side='short')
                 return
 
         if s_units > 0:
@@ -313,7 +313,7 @@ class Symbol():
                     log.info("%s: Cleaning Long order and positions" % self.instrument)
                     log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (
                         self.instrument, l_units, l_price, ltp['sell']))
-                    self.clean(side='buy')
+                    self.clean(side='long')
                 return
 
 
