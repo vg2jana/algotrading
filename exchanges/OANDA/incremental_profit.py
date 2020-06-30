@@ -161,8 +161,12 @@ def open_positions():
     return result
 
 
-def close_positions(instrument, side=None):
-    temp = o_positions.get(instrument, {})
+def close_positions(instrument, side=None, force=True):
+    if force is True:
+        _pos = open_positions()
+    else:
+        _pos = o_positions
+    temp = _pos.get(instrument, {})
     if len(temp) == 0:
         return
     l_units = abs(int(temp["long"]["units"]))
@@ -212,20 +216,23 @@ class Symbol():
         self.s_last_price = 0
         self.max_open_orders = 5
 
-    def clean(self, side=None):
-        # Cancel pending orders
-        if side == 'long':
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if int(o['units']) > 0]
-            p_orders.extend(p_orders)
-        elif side == 'short':
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if int(o['units']) < 0]
-            p_orders.extend(p_orders)
-        else:
-            p_orders = [o['id'] for o in o_orders.get(self.instrument, [])]
-        cancel_orders(p_orders)
+    def clean(self, side=None, refresh=True):
         # Close positions
         close_positions(self.instrument, side=side)
-        # Clear first order reference
+        if refresh is True:
+            orders = open_orders()
+        else:
+            orders = o_orders
+        # Cancel pending orders
+        if side == 'long':
+            p_orders = [o['id'] for o in orders.get(self.instrument, []) if int(o['units']) > 0]
+        elif side == 'short':
+            p_orders = [o['id'] for o in orders.get(self.instrument, []) if int(o['units']) < 0]
+        else:
+            p_orders = [o['id'] for o in orders.get(self.instrument, [])]
+        # Cancel orders
+        cancel_orders(p_orders)
+        # Clear references
         if side in ('long', None):
             self.l_last_price = 0
         if side in ('short', None):
@@ -288,7 +295,7 @@ class Symbol():
                 self.s_last_price = s_order_price
                 count += 1
 
-        if l_units > 0:
+        if l_units > self.config['qty']:
             tp_price = (l_price + self.l_last_price - (self.max_open_orders * self.config['stepSize'])) / 2
             if ltp is not None and (ltp['sell'] <= tp_price or l_units >= self.config["maxUnits"]):
                 log.info("%s: Cleaning Long order and positions" % self.instrument)
@@ -302,13 +309,13 @@ class Symbol():
                     self.clean(side='short')
                 return
 
-        if s_units > 0:
+        if s_units > self.config['qty']:
             tp_price = (s_price + self.s_last_price + (self.max_open_orders * self.config['stepSize'])) / 2
             if ltp is not None and (ltp['buy'] >= tp_price or s_units >= self.config["maxUnits"]):
                 log.info("%s: Cleaning Short order and positions" % self.instrument)
                 log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
                     self.instrument, s_units, s_price, tp_price))
-                self.clean(side='sell')
+                self.clean(side='short')
                 if s_units >= 7 * self.config['qty']:
                     log.info("%s: Cleaning Long order and positions" % self.instrument)
                     log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (
@@ -335,7 +342,7 @@ o_orders = open_orders()
 symbol_list = []
 for s, c in params["symbols"].items():
     symbol = Symbol(s, c)
-    symbol.clean()
+    symbol.clean(refresh=False)
     symbols.append(symbol)
     symbol_list.append(s)
 
