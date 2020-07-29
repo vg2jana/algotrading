@@ -215,30 +215,38 @@ class Symbol():
         self.l_last_price = 0
         self.s_last_price = 0
         self.max_open_orders = 5
+        self.l_fib_index = 0
+        self.l_fib_series = []
+        self.l_last_profit_pq = None
+        self.s_fib_index = 0
+        self.s_fib_series = []
+        self.s_last_profit_pq = None
 
-    def clean(self, side=None, refresh=True):
+    def clean(self, side=None):
         # Close positions
         close_positions(self.instrument, side=side)
-        if refresh is True:
-            orders = open_orders()
-        else:
-            orders = o_orders
-        # Cancel pending orders
-        if side == 'long':
-            p_orders = [o['id'] for o in orders.get(self.instrument, []) if int(o['units']) > 0]
-        elif side == 'short':
-            p_orders = [o['id'] for o in orders.get(self.instrument, []) if int(o['units']) < 0]
-        else:
-            p_orders = [o['id'] for o in orders.get(self.instrument, [])]
-        # Cancel orders
-        cancel_orders(p_orders)
         # Clear references
         if side in ('long', None):
-            self.l_last_price = 0
+            self.l_fib_index = 0
+            self.l_fib_series = []
+            self.l_last_profit_pq = None
         if side in ('short', None):
-            self.s_last_price = 0
+            self.s_fib_index = 0
+            self.s_fib_series = []
+            self.s_last_profit_pq = None
 
-    def run(self, o_pos, o_ord, ltp):
+    def compute_fib_series(self, price, side):
+        for n in fib_series:
+            qty = self.config['qty']
+            if side == 'long':
+                price -= self.config['stepSize'] * n
+                self.l_fib_series.append((qty, price))
+            else:
+                price += self.config['stepSize'] * n
+                self.s_fib_series.append((qty, price))
+            qty *= 2
+
+    def run(self, o_pos, ltp):
         l_price = None
         s_price = None
         l_units = 0
@@ -251,77 +259,102 @@ class Symbol():
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
 
-        l_orders = []
-        s_orders = []
-        for o in o_ord:
-            units = int(o.get('units', '0'))
-            if units > 0:
-                l_orders.append(o)
-            elif units < 0:
-                s_orders.append(o)
-
         if l_units == 0 or s_units == 0 and stop_signal is False:
             if l_units == 0:
-                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
+                log.info("%s: LONG Market order, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
             if s_units == 0:
-                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
+                log.info("%s: SHORT Market order, Units: -%s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'] * -1)
             return
 
-        if l_units > 0 and len(l_orders) <= self.max_open_orders:
-            count = len(l_orders)
-            while count <= self.max_open_orders and self.config["maxUnits"] >= l_units + (count * self.config['qty']):
-                if self.l_last_price == 0:
-                    l_order_price = l_price + self.config['first_step']
-                else:
-                    l_order_price = self.l_last_price + self.config['stepSize']
-                log.info("%s: Long Entry price: %s" % (self.instrument, l_price))
-                log.info("%s: Price: %s, Units: %s" % (self.instrument, l_order_price, self.config['qty']))
-                market_if_touched_order(self.instrument, l_order_price, self.config['qty'])
-                self.l_last_price = l_order_price
-                count += 1
+        if len(self.l_fib_series) == 0 and l_units > 0 and l_price is not None:
+            self.compute_fib_series(l_price, 'long')
+            log.info("%s: LONG Fib series: %s" % (self.instrument, self.l_fib_series))
+        if len(self.s_fib_series) == 0 and s_units > 0 and s_price is not None:
+            self.compute_fib_series(l_price, 'short')
+            log.info("%s: SHORT Fib series: %s" % (self.instrument, self.s_fib_series))
 
-        if s_units > 0 and len(s_orders) <= self.max_open_orders:
-            count = len(s_orders)
-            while count <= self.max_open_orders and self.config["maxUnits"] >= s_units + (count * self.config['qty']):
-                if self.s_last_price == 0:
-                    s_order_price = s_price - self.config['first_step']
-                else:
-                    s_order_price = self.s_last_price - self.config['stepSize']
-                log.info("%s: Short Entry price: %s" % (self.instrument, s_price))
-                log.info("%s: Price: %s, Units: %s" % (self.instrument, s_order_price, self.config['qty'] * -1))
-                market_if_touched_order(self.instrument, s_order_price, self.config['qty'] * -1)
-                self.s_last_price = s_order_price
-                count += 1
+        if ltp is not None:
+            #######################
+            # LONG FIBONACCI
+            #######################
+            if len(self.l_fib_series) == 0:
+                log.warning("%s: LONG Fib series length is 0" % self.instrument)
+            elif self.l_fib_index + 1 <= len(self.l_fib_series):
+                qty, price = self.l_fib_series[self.l_fib_index]
+                if ltp['buy'] <= price:
+                    log.info("%s: LONG Market order, FI: %s, FS: %s, Units: %s, Entry price: %s, Current price: %s" % (
+                        self.instrument, self.l_fib_index, self.l_fib_series, qty, l_price, ltp['buy']))
+                    market_order(self.instrument, qty)
+                    self.l_fib_index += 1
+            elif self.l_fib_index + 1 > len(self.l_fib_series):
+                log.info("%s: LONG Fib index %s exceeds series length: %s" % (
+                    self.instrument, self.l_fib_index + 1, len(self.l_fib_series)))
 
-        if l_units > self.config['qty']:
-            tp_price = (l_price + self.l_last_price - (self.max_open_orders * self.config['stepSize'])) / 2
-            if ltp is not None and (ltp['sell'] <= tp_price or l_units >= self.config["maxUnits"]):
-                log.info("%s: Cleaning Long order and positions" % self.instrument)
-                log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (
-                    self.instrument, l_units, l_price, tp_price))
-                self.clean(side='long')
-                if l_units >= 7 * self.config['qty']:
-                    log.info("%s: Cleaning Short order and positions" % self.instrument)
-                    log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
-                        self.instrument, s_units, s_price, ltp['buy']))
-                    self.clean(side='short')
-                return
+            #######################
+            # SHORT FIBONACCI
+            #######################
+            if len(self.s_fib_series) == 0:
+                log.warning("%s: SHORT Fib series length is 0" % self.instrument)
+            elif self.s_fib_index + 1 <= len(self.s_fib_series):
+                qty, price = self.s_fib_series[self.s_fib_index]
+                if ltp['sell'] >= price:
+                    log.info("%s: SHORT Market order, FI: %s, FS: %s, Units: -%s, Entry price: %s, Current price: %s" % (
+                        self.instrument, self.s_fib_index, self.s_fib_series, qty, s_price, ltp['sell']))
+                    market_order(self.instrument, qty * -1)
+                    self.s_fib_index += 1
+            elif self.s_fib_index + 1 > len(self.s_fib_series):
+                log.info("%s: SHORT Fib index %s exceeds series length: %s" % (
+                    self.instrument, self.s_fib_index + 1, len(self.s_fib_series)))
 
-        if s_units > self.config['qty']:
-            tp_price = (s_price + self.s_last_price + (self.max_open_orders * self.config['stepSize'])) / 2
-            if ltp is not None and (ltp['buy'] >= tp_price or s_units >= self.config["maxUnits"]):
-                log.info("%s: Cleaning Short order and positions" % self.instrument)
-                log.info("%s: SHORT: Units: %s, Entry_price: %s, Exit_price: %s" % (
-                    self.instrument, s_units, s_price, tp_price))
-                self.clean(side='short')
-                if s_units >= 7 * self.config['qty']:
-                    log.info("%s: Cleaning Long order and positions" % self.instrument)
-                    log.info("%s: LONG: Units: %s, Entry_price: %s, Exit_price: %s" % (
+            #######################
+            # LONG PROFIT/CLOSE
+            #######################
+            if self.l_last_profit_pq is None:
+                tp_price = l_price + self.config['takeProfit']
+                qty = min(l_units, 1000)
+            else:
+                tp_price = self.l_last_profit_pq[1]
+                qty = self.l_last_profit_pq[0]
+
+            if ltp['buy'] > tp_price + self.config['stepSize']:
+                log.info("%s: LONG Market order, Last price: %s, Current unit: %s, Units: %s" % (
+                    self.instrument, tp_price, l_units, qty))
+                market_order(self.instrument, qty)
+                self.l_last_profit_pq = [qty, ltp['buy']]
+
+            # At least one profit order
+            elif self.l_last_profit_pq is not None and self.l_last_profit_pq[1] > l_price + self.config['takeProfit']:
+                if ltp['sell'] <= (l_price + self.l_last_profit_pq[1]) / 2 or l_units >= self.config['maxUnits']:
+                    log.info("%s: Clearing LONG positions, Current unit: %s, Entry price: %s, Exit price: %s" % (
                         self.instrument, l_units, l_price, ltp['sell']))
                     self.clean(side='long')
-                return
+                    return
+
+            #######################
+            # SHORT PROFIT/CLOSE
+            #######################
+            if self.s_last_profit_pq is None:
+                tp_price = s_price - self.config['takeProfit']
+                qty = min(s_units, 1000)
+            else:
+                tp_price = self.s_last_profit_pq[1]
+                qty = self.s_last_profit_pq[0]
+
+            if ltp['sell'] < tp_price - self.config['stepSize']:
+                log.info("%s: SHORT Market order, Last price: %s, Current unit: %s, Units: -%s" % (
+                    self.instrument, tp_price, s_units, qty))
+                market_order(self.instrument, qty * -1)
+                self.s_last_profit_pq = [qty, ltp['sell']]
+
+            # At least one profit order
+            elif self.s_last_profit_pq is not None and self.s_last_profit_pq[1] < s_price - self.config['takeProfit']:
+                if ltp['buy'] >= (s_price + self.s_last_profit_pq[1]) / 2 or s_units >= self.config['maxUnits']:
+                    log.info("%s: Clearing SHORT positions, Current unit: %s, Entry price: %s, Exit price: %s" % (
+                        self.instrument, s_units, s_price, ltp['buy']))
+                    self.clean(side='short')
+                    return
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
@@ -338,33 +371,31 @@ account_id = "101-009-13015690-002"
 
 symbols = []
 o_positions = open_positions()
-o_orders = open_orders()
 symbol_list = []
 for s, c in params["symbols"].items():
     symbol = Symbol(s, c)
-    symbol.clean(refresh=False)
+    symbol.clean()
     symbols.append(symbol)
     symbol_list.append(s)
 
 time.sleep(2)
 refresh_time = 2
 stop_signal = False
+fib_series = (1, 2, 3, 5, 8, 13, 21, 34, 55)
 while True:
     try:
         if os.path.exists('STOP'):
             stop_signal = True
 
         o_positions = open_positions()
-        o_orders = open_orders()
         prices = get_prices()
 
         for symbol in symbols:
             o_p = o_positions.get(symbol.instrument, {})
-            o_o = o_orders.get(symbol.instrument, {})
             if stop_signal is True and len(o_p) == 0:
                 continue
 
-            symbol.run(o_p, o_o, prices.get(symbol.instrument, None))
+            symbol.run(o_p, prices.get(symbol.instrument, None))
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     except requests.exceptions.ConnectionError as e:

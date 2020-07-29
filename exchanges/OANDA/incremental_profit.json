@@ -1,27 +1,73 @@
 {
     "symbols": {
 
+        "EUR_USD": {
+            "qty": 30,
+            "takeProfit": 0.01500,
+            "stepSize": 0.00050,
+            "maxUnits": 15000
+        },
+
+        "EUR_JPY": {
+            "qty": 30,
+            "takeProfit": 3,
+            "stepSize": 0.1,
+            "maxUnits": 15000
+        },
+
+        "EUR_AUD": {
+            "qty": 30,
+            "takeProfit": 0.03000,
+            "stepSize": 0.00100,
+            "maxUnits": 15000
+        },
+
         "GBP_USD": {
-            "qty": 1000,
-            "first_step": 0.03,
+            "qty": 30,
+            "takeProfit": 0.03,
             "stepSize": 0.001,
-            "precision": 5,
             "maxUnits": 15000
         },
 
         "GBP_NZD": {
-            "qty": 1000,
-            "first_step": 0.03,
+            "qty": 10,
+            "takeProfit": 0.03,
             "stepSize": 0.001,
-            "precision": 5,
+            "maxUnits": 15000
+        },
+
+        "GBP_HKD": {
+            "qty": 30,
+            "takeProfit": 0.3,
+            "stepSize": 0.01,
+            "maxUnits": 15000
+        },
+
+        "NZD_USD": {
+            "qty": 60,
+            "takeProfit": 0.03,
+            "stepSize": 0.001,
             "maxUnits": 15000
         },
 
         "NZD_JPY": {
-            "qty": 1000,
-            "first_step": 0.3,
+            "qty": 45,
+            "takeProfit": 1.5,
+            "stepSize": 0.05,
+            "maxUnits": 15000
+        },
+
+        "NZD_CAD": {
+            "qty": 60,
+            "takeProfit": 0.03,
+            "stepSize": 0.001,
+            "maxUnits": 15000
+        },
+
+        "USD_JPY": {
+            "qty": 30,
+            "takeProfit": 3,
             "stepSize": 0.1,
-            "precision": 5,
             "maxUnits": 15000
         }
     }
