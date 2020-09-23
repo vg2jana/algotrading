@@ -3,7 +3,7 @@
 
         "EUR_USD": {
             "qty": 30,
-            "takeProfit": 0.01500,
+            "takeProfit": 0.00150,
             "stepSize": 0.00050,
             "maxUnits": 15000
         },

@@ -216,11 +216,9 @@ class Symbol():
         if side == 'long':
             p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
                             int(o['units']) > 0 and o['type'] == 'LIMIT']
-            p_orders.extend(p_orders)
         elif side == 'short':
             p_orders = [o['id'] for o in o_orders.get(self.instrument, []) if
                             int(o['units']) < 0 and o['type'] == 'LIMIT']
-            p_orders.extend(p_orders)
         else:
             p_orders = [o['id'] for o in o_orders.get(self.instrument, [])]
         cancel_orders(p_orders)
@@ -245,6 +243,20 @@ class Symbol():
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
 
+        if l_units > 0:
+            tp_price = l_price + self.config['takeProfit']
+            if ltp is not None and ltp['sell'] >= tp_price:
+                log.info("%s: Cleaning Long order and positions" % self.instrument)
+                self.clean(side='long')
+                return
+
+        if s_units > 0:
+            tp_price = s_price - self.config['takeProfit']
+            if ltp is not None and ltp['buy'] <= tp_price:
+                log.info("%s: Cleaning Short order and positions" % self.instrument)
+                self.clean(side='short')
+                return
+
         l_orders = []
         s_orders = []
         for o in o_ord:
@@ -266,7 +278,7 @@ class Symbol():
         if l_units > 0 and len(l_orders) == 0 and self.l_fib_index < len(fib_series):
             offset = sum(fib_series[:self.l_fib_index+1]) * self.config['stepSize']
             order_price = l_price - offset
-            log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
+            log.info("%s: LIMIT Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           l_units, self.l_fib_index))
             limit_order(self.instrument, order_price, l_units)
             self.l_fib_index += 1
@@ -274,24 +286,10 @@ class Symbol():
         if s_units > 0 and len(s_orders) == 0 and self.s_fib_index < len(fib_series):
             offset = sum(fib_series[:self.s_fib_index+1]) * self.config['stepSize']
             order_price = s_price + offset
-            log.info("%s: Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
+            log.info("%s: LIMIT Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           s_units, self.s_fib_index))
             limit_order(self.instrument, order_price, s_units * -1)
             self.s_fib_index += 1
-
-        if l_units > 0:
-            tp_price = l_price + self.config['takeProfit']
-            if ltp is not None and ltp['sell'] >= tp_price:
-                log.info("%s: Cleaning Long order and positions" % self.instrument)
-                self.clean(side='long')
-                return
-
-        if s_units > 0:
-            tp_price = s_price - self.config['takeProfit']
-            if ltp is not None and ltp['buy'] <= tp_price:
-                log.info("%s: Cleaning Short order and positions" % self.instrument)
-                self.clean(side='short')
-                return
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
@@ -328,7 +326,6 @@ while True:
         o_positions = open_positions()
         o_orders = open_orders()
         prices = get_prices()
-        # unrealized_pnls = sum([float(pnl.get('unrealizedPL', '0')) for pnl in o_positions.values()])
 
         for symbol in symbols:
             o_p = o_positions.get(symbol.instrument, {})
@@ -336,12 +333,13 @@ while True:
             if stop_signal is True and len(o_p) == 0:
                 continue
 
-            # if unrealized_pnls > params['minJPY']:
-            #     log.info("%s: Cleaning all orders and positions" % symbol.instrument)
-            #     symbol.clean()
-            #     continue
-
             symbol.run(o_p, o_o, prices.get(symbol.instrument, None))
+
+            if os.path.exists("CLOSE_%s" % symbol.instrument):
+                log.info("%s: Cleaning all orders and positions on CLOSE SIGNAL" % symbol.instrument)
+                symbol.clean()
+                os.remove("CLOSE_%s" % symbol.instrument)
+
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     except requests.exceptions.ConnectionError as e:
