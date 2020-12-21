@@ -28,7 +28,7 @@
         },
 
         "AUD_USD": {
-            "qty": 1000,
+            "qty": 800,
             "firstStep": 0.01,
             "forwardStepSize": 0.0005,
             "fibStepSize": 0.005,
@@ -37,7 +37,7 @@
         },
 
         "AUD_CHF": {
-            "qty": 750,
+            "qty": 650,
             "firstStep": 0.01,
             "forwardStepSize": 0.001,
             "fibStepSize": 0.01,
@@ -46,7 +46,7 @@
         },
 
         "AUD_NZD": {
-            "qty": 1000,
+            "qty": 800,
             "firstStep": 0.01,
             "forwardStepSize": 0.001,
             "fibStepSize": 0.005,
@@ -55,7 +55,7 @@
         },
 
         "GBP_HKD": {
-            "qty": 500,
+            "qty": 200,
             "firstStep": 0.1,
             "forwardStepSize": 0.01,
             "fibStepSize": 0.1,
@@ -64,7 +64,7 @@
         },
 
         "GBP_USD": {
-            "qty": 500,
+            "qty": 400,
             "firstStep": 0.1,
             "forwardStepSize": 0.01,
             "fibStepSize": 0.05,
@@ -73,7 +73,7 @@
         },
 
         "GBP_NZD": {
-            "qty": 160,
+            "qty": 400,
             "firstStep": 0.02,
             "forwardStepSize": 0.001,
             "fibStepSize": 0.01,
@@ -82,7 +82,7 @@
         },
 
         "USD_JPY": {
-            "qty": 500,
+            "qty": 600,
             "firstStep": 1.0,
             "forwardStepSize": 0.05,
             "fibStepSize": 0.5,
@@ -91,7 +91,7 @@
         },
 
         "USD_CAD": {
-            "qty": 500,
+            "qty": 600,
             "firstStep": 0.1,
             "forwardStepSize": 0.01,
             "fibStepSize": 0.05,
@@ -109,7 +109,7 @@
         },
 
         "USD_HKD": {
-            "qty": 500,
+            "qty": 250,
             "firstStep": 0.005,
             "forwardStepSize": 0.0005,
             "fibStepSize": 0.0025,
@@ -118,7 +118,7 @@
         },
 
         "NZD_USD": {
-            "qty": 1000,
+            "qty": 800,
             "firstStep": 0.01,
             "forwardStepSize": 0.001,
             "fibStepSize": 0.01,
@@ -127,7 +127,7 @@
         },
 
         "NZD_JPY": {
-            "qty": 750,
+            "qty": 850,
             "firstStep": 0.5,
             "forwardStepSize": 0.05,
             "fibStepSize": 0.5,
@@ -136,7 +136,7 @@
         },
 
         "NZD_CAD": {
-            "qty": 1000,
+            "qty": 800,
             "firstStep": 0.05,
             "forwardStepSize": 0.005,
             "fibStepSize": 0.05,
@@ -145,7 +145,7 @@
         },
 
         "SGD_JPY": {
-            "qty": 750,
+            "qty": 650,
             "firstStep": 0.5,
             "forwardStepSize": 0.05,
             "fibStepSize": 0.5,
