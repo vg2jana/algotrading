@@ -291,7 +291,7 @@ class Symbol():
             return
 
         if l_units > 0 and len(l_orders) == 0 and self.l_fib_index < len(fib_series):
-            offset = sum(fib_series[:self.l_fib_index+1]) * self.config['firstStep']
+            offset = sum(fib_series[:self.l_fib_index+1]) * self.config['fibStepSize']
             order_price = l_price - offset
             log.info("%s: Long LIMIT Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           l_units, self.l_fib_index))
@@ -299,7 +299,7 @@ class Symbol():
             self.l_fib_index += 1
 
         if s_units > 0 and len(s_orders) == 0 and self.s_fib_index < len(fib_series):
-            offset = sum(fib_series[:self.s_fib_index+1]) * self.config['firstStep']
+            offset = sum(fib_series[:self.s_fib_index+1]) * self.config['fibStepSize']
             order_price = s_price + offset
             log.info("%s: Short LIMIT Offset: %s, Price: %s, Units: %s, Index: %s" % (self.instrument, offset, order_price,
                                                                           s_units, self.s_fib_index))
@@ -308,9 +308,9 @@ class Symbol():
 
         if self.l_trigger is True:
             if len(self.l_trigger_orders) == 0:
-                price = l_price + self.config['firstStep'] + self.config['stepSize']
+                price = l_price + self.config['firstStep'] + self.config['forwardStepSize']
             else:
-                price = self.l_trigger_orders[-1] + self.config['stepSize']
+                price = self.l_trigger_orders[-1] + self.config['forwardStepSize']
             if ltp is not None and ltp['buy'] >= price:
                 units = int(l_units * 0.1)
                 log.info("%s: Long Market order for no: %d, Units: %s" % (self.instrument, len(self.l_trigger_orders) + 1, units))
@@ -319,9 +319,9 @@ class Symbol():
 
         if self.s_trigger is True:
             if len(self.s_trigger_orders) == 0:
-                price = s_price - self.config['firstStep'] - self.config['stepSize']
+                price = s_price - self.config['firstStep'] - self.config['forwardStepSize']
             else:
-                price = self.s_trigger_orders[-1] - self.config['stepSize']
+                price = self.s_trigger_orders[-1] - self.config['forwardStepSize']
             if ltp is not None and ltp['sell'] <= price:
                 units = int(s_units * 0.1) * -1
                 log.info("%s: Short Market order for no: %d, Units: %s" % (self.instrument, len(self.s_trigger_orders) + 1, units))
