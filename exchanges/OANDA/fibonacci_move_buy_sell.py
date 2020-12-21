@@ -350,8 +350,6 @@ for s, c in params["symbols"].items():
     symbol.clean()
     symbols.append(symbol)
     symbol_list.append(s)
-    if len(symbol_list) == 2:
-        break
 
 time.sleep(2)
 refresh_time = 2
