@@ -2,7 +2,7 @@
     "minJPY": 150,
     "symbols": {
         "EUR_USD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.00050,
             "takeProfit": 0.00500,
             "fi": 3,
@@ -10,7 +10,7 @@
         },
 
         "EUR_JPY": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.1,
             "takeProfit": 1,
             "fi": 3,
@@ -18,7 +18,7 @@
         },
 
         "EUR_AUD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.00100,
             "takeProfit": 0.01000,
             "fi": 3,
@@ -26,7 +26,7 @@
         },
 
         "AUD_USD": {
-            "qty": 180,
+            "qty": 900,
             "stepSize": 0.00050,
             "takeProfit": 0.00500,
             "fi": 3,
@@ -34,7 +34,7 @@
         },
 
         "AUD_CHF": {
-            "qty": 135,
+            "qty": 675,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -42,7 +42,7 @@
         },
 
         "AUD_NZD": {
-            "qty": 180,
+            "qty": 900,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -50,7 +50,7 @@
         },
 
         "GBP_HKD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.01,
             "takeProfit": 0.1,
             "fi": 3,
@@ -58,7 +58,7 @@
         },
 
         "GBP_USD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -66,7 +66,7 @@
         },
 
         "GBP_NZD": {
-            "qty": 50,
+            "qty": 250,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -74,7 +74,7 @@
         },
 
         "USD_JPY": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.1,
             "takeProfit": 1,
             "fi": 3,
@@ -82,7 +82,7 @@
         },
 
         "USD_CAD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -90,7 +90,7 @@
         },
 
         "USD_INR": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.05,
             "takeProfit": 0.5,
             "fi": 3,
@@ -98,7 +98,7 @@
         },
 
         "USD_SGD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.001,
             "takeProfit": 0.1,
             "fi": 3,
@@ -106,7 +106,7 @@
         },
 
         "USD_HKD": {
-            "qty": 150,
+            "qty": 750,
             "stepSize": 0.001,
             "takeProfit": 0.1,
             "fi": 3,
@@ -114,7 +114,7 @@
         },
 
         "NZD_USD": {
-            "qty": 180,
+            "qty": 900,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -122,7 +122,7 @@
         },
 
         "NZD_JPY": {
-            "qty": 135,
+            "qty": 675,
             "stepSize": 0.05,
             "takeProfit": 0.5,
             "fi": 3,
@@ -130,7 +130,7 @@
         },
 
         "NZD_CAD": {
-            "qty": 180,
+            "qty": 900,
             "stepSize": 0.001,
             "takeProfit": 0.01,
             "fi": 3,
@@ -138,7 +138,7 @@
         },
 
         "SGD_JPY": {
-            "qty": 135,
+            "qty": 675,
             "stepSize": 0.1,
             "takeProfit": 1,
             "fi": 3,
@@ -146,7 +146,7 @@
         },
 
         "CAD_JPY": {
-            "qty": 135,
+            "qty": 675,
             "stepSize": 0.1,
             "takeProfit": 1,
             "fi": 3,
