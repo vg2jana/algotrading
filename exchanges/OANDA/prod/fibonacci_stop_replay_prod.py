@@ -320,6 +320,8 @@ with open('key.json', 'r') as f:
 with open('fibonacci_stop_replay_prod.json', 'r') as f:
     params = json.load(f)
 
+log.info("Program S T A R T I N G")
+
 token = key['prod_token']
 client = oandapyV20.API(access_token=token, environment="live")
 account_id = "001-009-4204796-002"
@@ -328,6 +330,7 @@ symbols = []
 o_positions = open_positions()
 o_orders = open_orders()
 symbol_list = []
+log.info("Clearing existing positions...")
 for s, c in params["symbols"].items():
     symbol = Symbol(s, c)
     symbol.clean()
@@ -390,12 +393,13 @@ while True:
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
+
     except requests.exceptions.ConnectionError as e:
         log.warning(e)
         while True:
             log.info("Retrying...")
             try:
-                client = oandapyV20.API(access_token=token, environment="practice")
+                client = oandapyV20.API(access_token=token, environment="live")
             except Exception as e:
                 log.warning(e)
                 time.sleep(60)
