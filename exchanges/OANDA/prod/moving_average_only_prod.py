@@ -237,6 +237,8 @@ class Symbol:
         self.s_last_price = None
         self.l_last_time = None
         self.s_last_time = None
+        self.l_sl_price = None
+        self.s_sl_price = None
 
     def clean(self, side=None):
         # Cancel pending orders
@@ -256,9 +258,11 @@ class Symbol:
         if side in ('long', None):
             self.l_last_price = None
             self.l_last_time = None
+            self.l_sl_price = None
         if side in ('short', None):
             self.s_last_price = None
             self.s_last_time = None
+            self.s_sl_price = None
 
     def update_trend(self):
         granularity = self.config["granularity"]
@@ -274,13 +278,13 @@ class Symbol:
                 self.df = pd.concat([self.df, _df])
                 self.df = self.df.tail(self.max_df_rows)
 
-        candle_client.moving_average(self.df, 9)
-        candle_client.moving_average(self.df, 20)
-        candle_client.moving_average(self.df, 50)
-        candle_client.moving_average(self.df, 200)
+        self.df = candle_client.moving_average(self.df, 9)
+        self.df = candle_client.moving_average(self.df, 20)
+        self.df = candle_client.moving_average(self.df, 50)
+        self.df = candle_client.moving_average(self.df, 200)
 
         # Drop the first 200 rows as the average is not accurate
-        _df = self.df.iloc[200:]
+        _df = pd.DataFrame(self.df.iloc[200:])
         _df["buy_signal"] = (_df["sma_200"] > _df["sma_50"].shift()) & (_df["sma_200"] < _df["sma_50"]) & (
                 _df["sma_50"] < _df["sma_20"]) & (_df["sma_20"] < _df["sma_9"])
         _df["trend_high"] = (_df["sma_200"] < _df["sma_50"]) & (_df["sma_50"] < _df["sma_20"]) & (
@@ -305,10 +309,25 @@ class Symbol:
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
 
+        if l_units == 0 or s_units == 0:
+            if l_units == 0 and self.signal_df.iloc[-1]["buy_signal"] is True:
+                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
+                market_order(self.instrument, self.config['qty'])
+                self.l_last_time = self.signal_df.iloc[-1]["datetime"]
+            if s_units == 0 and self.signal_df.iloc[-1]["sell_signal"] is True:
+                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
+                market_order(self.instrument, self.config['qty'] * -1)
+                self.s_last_time = self.signal_df.iloc[-1]["datetime"]
+            return
+
         if l_units > 0:
             tp_price = l_price + self.config['takeProfit']
             if ltp is not None and ltp['sell'] >= tp_price and self.signal_df["trend_high"] is False:
-                log.info("%s: Cleaning Long order and positions" % self.instrument)
+                log.info("%s: TakeProfit - Cleaning Long order and positions" % self.instrument)
+                self.clean(side='long')
+                return
+            if self.l_sl_price is not None and ltp is not None and ltp['sell'] <= self.l_sl_price:
+                log.info("%s: StopLoss hit - Cleaning Long order and positions" % self.instrument)
                 self.clean(side='long')
                 return
 
@@ -318,49 +337,48 @@ class Symbol:
                 log.info("%s: Cleaning Short order and positions" % self.instrument)
                 self.clean(side='short')
                 return
+            if self.s_sl_price is not None and ltp is not None and ltp['buy'] >= self.s_sl_price:
+                log.info("%s: StopLoss hit - Cleaning Short order and positions" % self.instrument)
+                self.clean(side='short')
+                return
 
-        if l_units == 0 or s_units == 0:
-            if l_units == 0 and self.signal_df[-1]["buy_signal"] is True:
-                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty']))
-                market_order(self.instrument, self.config['qty'])
-                self.l_last_time = self.signal_df[-1]["datetime"]
-            if s_units == 0 and self.signal_df[-1]["sell_signal"] is True:
-                log.info("%s: Market order, Units: %s" % (self.instrument, self.config['qty'] * -1))
-                market_order(self.instrument, self.config['qty'] * -1)
-                self.s_last_time = self.signal_df[-1]["datetime"]
-            return
+        if l_units > 0 and ltp['sell'] >= l_price + self.config["stopLossAfter"]:
+            self.l_sl_price = l_price
 
-        if l_units == self.config['qty'] and self.signal_df[-1]["buy_signal"] is True and \
-                self.signal_df[-1]["datetime"] != self.l_last_time:
-            log.info("%s: Market Buy order, Units: %s" % (self.instrument, self.config['qty']))
-            market_order(self.instrument, self.config['qty'])
-            self.l_last_price = float(self.signal_df[-1]["close"])
-            self.l_last_time = self.signal_df[-1]["datetime"]
+        if s_units > 0 and ltp['buy'] <= s_price - self.config["stopLossAfter"]:
+            self.s_sl_price = s_price
 
-        if s_units == self.config['qty'] and self.signal_df[-1]["sell_signal"] is True and \
-                self.signal_df[-1]["datetime"] != self.s_last_time:
-            log.info("%s: Market Sell order, Units: %s" % (self.instrument, self.config['qty'] * -1))
-            market_order(self.instrument, self.config['qty'] * -1)
-            self.s_last_price = float(self.signal_df[-1]["close"])
-            self.s_last_time = self.signal_df[-1]["datetime"]
+        # if l_units == self.config['qty'] and self.signal_df.iloc[-1]["buy_signal"] is True and \
+        #         self.signal_df.iloc[-1]["datetime"] != self.l_last_time:
+        #     log.info("%s: Market Buy order, Units: %s" % (self.instrument, self.config['qty']))
+        #     market_order(self.instrument, self.config['qty'])
+        #     self.l_last_price = float(self.signal_df.iloc[-1]["close"])
+        #     self.l_last_time = self.signal_df.iloc[-1]["datetime"]
+        #
+        # if s_units == self.config['qty'] and self.signal_df.iloc[-1]["sell_signal"] is True and \
+        #         self.signal_df.iloc[-1]["datetime"] != self.s_last_time:
+        #     log.info("%s: Market Sell order, Units: %s" % (self.instrument, self.config['qty'] * -1))
+        #     market_order(self.instrument, self.config['qty'] * -1)
+        #     self.s_last_price = float(self.signal_df.iloc[-1]["close"])
+        #     self.s_last_time = self.signal_df.iloc[-1]["datetime"]
 
-        if l_units > self.config['qty'] and self.signal_df[-1]["buy_signal"] is True and \
-                self.signal_df[-1]["datetime"] != self.l_last_time:
-            gap = abs(self.l_last_price - self.signal_df[-1]["close"])
-            if gap >= self.config["takeProfit"] * l_units / self.config['qty']:
-                log.info("%s: Market Buy order, Units: %s" % (self.instrument, self.config['qty']))
-                market_order(self.instrument, self.config['qty'])
-                self.l_last_price = float(self.signal_df[-1]["close"])
-                self.l_last_time = self.signal_df[-1]["datetime"]
-
-        if s_units > self.config['qty'] and self.signal_df[-1]["sell_signal"] is True and \
-                self.signal_df[-1]["datetime"] != self.s_last_time:
-            gap = abs(self.s_last_price - self.signal_df[-1]["close"])
-            if gap >= self.config["takeProfit"] * s_units / self.config['qty']:
-                log.info("%s: Market Sell order, Units: %s" % (self.instrument, self.config['qty'] * -1))
-                market_order(self.instrument, self.config['qty'] * -1)
-                self.s_last_price = float(self.signal_df[-1]["close"])
-                self.s_last_time = self.signal_df[-1]["datetime"]
+        # if l_units > self.config['qty'] and self.signal_df.iloc[-1]["buy_signal"] is True and \
+        #         self.signal_df.iloc[-1]["datetime"] != self.l_last_time:
+        #     gap = abs(self.l_last_price - self.signal_df.iloc[-1]["close"])
+        #     if gap >= self.config["takeProfit"] * l_units / self.config['qty']:
+        #         log.info("%s: Market Buy order, Units: %s" % (self.instrument, self.config['qty']))
+        #         market_order(self.instrument, self.config['qty'])
+        #         self.l_last_price = float(self.signal_df.iloc[-1]["close"])
+        #         self.l_last_time = self.signal_df.iloc[-1]["datetime"]
+        #
+        # if s_units > self.config['qty'] and self.signal_df.iloc[-1]["sell_signal"] is True and \
+        #         self.signal_df.iloc[-1]["datetime"] != self.s_last_time:
+        #     gap = abs(self.s_last_price - self.signal_df.iloc[-1]["close"])
+        #     if gap >= self.config["takeProfit"] * s_units / self.config['qty']:
+        #         log.info("%s: Market Sell order, Units: %s" % (self.instrument, self.config['qty'] * -1))
+        #         market_order(self.instrument, self.config['qty'] * -1)
+        #         self.s_last_price = float(self.signal_df.iloc[-1]["close"])
+        #         self.s_last_time = self.signal_df.iloc[-1]["datetime"]
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',

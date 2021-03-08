@@ -2,6 +2,7 @@
     "symbols": {
         "EUR_USD": {
             "qty": 1,
+            "stopLossAfter": 0.00250,
             "takeProfit": 0.00500,
             "precision": 5,
             "granularity": "M15"
@@ -9,6 +10,7 @@
 
         "CAD_JPY": {
             "qty": 1,
+            "stopLossAfter": 0.25,
             "takeProfit": 0.5,
             "precision": 3,
             "granularity": "M15"
