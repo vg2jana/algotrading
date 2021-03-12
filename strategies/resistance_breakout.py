@@ -83,6 +83,7 @@ cursor.close()
 query = 'SELECT * FROM "1d_CGF.AX"'
 ohlc_intraday['TEST'] = pd.read_sql_query(query, conn, index_col='Datetime')
 
+
  
 tickers = ohlc_intraday.keys() # redefine tickers variable after removing any tickers with corrupted data
 

@@ -265,34 +265,41 @@ class Symbol:
             self.s_sl_price = None
 
     def update_trend(self):
+        new_candle = False
         granularity = self.config["granularity"]
         if self.df is None:
             _to = "{}Z".format(datetime.datetime.utcnow().isoformat())
             data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
             self.df = pd.DataFrame(data)
+            new_candle = True
         else:
             last_time = self.df.iloc[-1]["datetime"]
             data = candle_client.fetch_ohlc(self.instrument, granularity, t_from=last_time, includeFirst=False)
             if len(data) > 0:
                 _df = pd.DataFrame(data)
-                self.df = pd.concat([self.df, _df])
+                self.df = pd.concat([self.df, _df], ignore_index=True)
                 self.df = self.df.tail(self.max_df_rows)
+                self.df.reset_index(drop=True, inplace=True)
+                new_candle = True
 
-        self.df = candle_client.moving_average(self.df, 9)
-        self.df = candle_client.moving_average(self.df, 20)
-        self.df = candle_client.moving_average(self.df, 50)
-        self.df = candle_client.moving_average(self.df, 200)
+        if new_candle is False:
+            return
+
+        candle_client.moving_average(self.df, 9)
+        candle_client.moving_average(self.df, 20)
+        candle_client.moving_average(self.df, 50)
+        candle_client.moving_average(self.df, 200)
 
         # Drop the first 200 rows as the average is not accurate
         _df = pd.DataFrame(self.df.iloc[200:])
-        _df["buy_signal"] = (_df["sma_200"] > _df["sma_50"].shift()) & (_df["sma_200"] < _df["sma_50"]) & (
-                _df["sma_50"] < _df["sma_20"]) & (_df["sma_20"] < _df["sma_9"])
-        _df["trend_high"] = (_df["sma_200"] < _df["sma_50"]) & (_df["sma_50"] < _df["sma_20"]) & (
-                _df["sma_50"] < _df["sma_9"])
-        _df["sell_signal"] = (_df["sma_200"] < _df["sma_50"].shift()) & (_df["sma_200"] > _df["sma_50"]) & (
-                _df["sma_50"] > _df["sma_20"]) & (_df["sma_20"] > _df["sma_9"])
-        _df["trend_low"] = (_df["sma_200"] > _df["sma_50"]) & (_df["sma_50"] > _df["sma_20"]) & (
-                _df["sma_50"] > _df["sma_9"])
+        _df["buy_signal"] = (_df["close_200_sma"] > _df["close_50_sma"].shift()) & (_df["close_200_sma"] < _df["close_50_sma"]) & (
+                _df["close_50_sma"] < _df["close_20_sma"]) & (_df["close_20_sma"] < _df["close_9_sma"])
+        _df["trend_high"] = (_df["close_200_sma"] < _df["close_50_sma"]) & (_df["close_50_sma"] < _df["close_20_sma"]) & (
+                _df["close_50_sma"] < _df["close_9_sma"])
+        _df["sell_signal"] = (_df["close_200_sma"] < _df["close_50_sma"].shift()) & (_df["close_200_sma"] > _df["close_50_sma"]) & (
+                _df["close_50_sma"] > _df["close_20_sma"]) & (_df["close_20_sma"] > _df["close_9_sma"])
+        _df["trend_low"] = (_df["close_200_sma"] > _df["close_50_sma"]) & (_df["close_50_sma"] > _df["close_20_sma"]) & (
+                _df["close_50_sma"] > _df["close_9_sma"])
 
         self.signal_df = _df
 
@@ -320,24 +327,26 @@ class Symbol:
                 self.s_last_time = self.signal_df.iloc[-1]["datetime"]
             return
 
-        if l_units > 0:
+        if l_units > 0 and ltp is not None:
             tp_price = l_price + self.config['takeProfit']
-            if ltp is not None and ltp['sell'] >= tp_price and self.signal_df["trend_high"] is False:
+            if (ltp['sell'] >= tp_price and self.signal_df["trend_high"] is False) or (
+                    self.signal_df.iloc[-1]["trend_high"] is False and ltp['sell'] <= l_price):
                 log.info("%s: TakeProfit - Cleaning Long order and positions" % self.instrument)
                 self.clean(side='long')
                 return
-            if self.l_sl_price is not None and ltp is not None and ltp['sell'] <= self.l_sl_price:
+            if self.l_sl_price is not None and ltp['sell'] <= self.l_sl_price:
                 log.info("%s: StopLoss hit - Cleaning Long order and positions" % self.instrument)
                 self.clean(side='long')
                 return
 
-        if s_units > 0:
+        if s_units > 0 and ltp is not None:
             tp_price = s_price - self.config['takeProfit']
-            if ltp is not None and ltp['buy'] <= tp_price and self.signal_df["trend_low"] is False:
+            if (ltp['buy'] <= tp_price and self.signal_df["trend_low"] is False) or (
+                    self.signal_df.iloc[-1]["trend_low"] is False and ltp['buy'] >= s_price):
                 log.info("%s: Cleaning Short order and positions" % self.instrument)
                 self.clean(side='short')
                 return
-            if self.s_sl_price is not None and ltp is not None and ltp['buy'] >= self.s_sl_price:
+            if self.s_sl_price is not None and ltp['buy'] >= self.s_sl_price:
                 log.info("%s: StopLoss hit - Cleaning Short order and positions" % self.instrument)
                 self.clean(side='short')
                 return

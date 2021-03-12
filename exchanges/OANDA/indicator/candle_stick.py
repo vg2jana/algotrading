@@ -20,9 +20,6 @@ from stockstats import StockDataFrame
 class Candles:
 
     def __init__(self, client):
-        with open('../prod/key.json', 'r') as f:
-            key = json.load(f)
-        token = key['prod_token']
         self.client = client
         self.log = logging.getLogger()
 
@@ -65,12 +62,13 @@ class Candles:
 
     @staticmethod
     def moving_average(dataframe, n_candles, source="close"):
-        _df = StockDataFrame.retype(dataframe)
+        DF = dataframe.copy()
         _func = "{}_{}_sma".format(source, n_candles)
-        _name = "sma_{}".format(n_candles)
-        dataframe.append(_df.get(_func))
-        dataframe.rename(columns={_func: _name}, inplace=True)
-        return dataframe
+        if _func in DF.columns:
+            DF = DF.drop(columns=_func, axis=1)
+        _df = StockDataFrame.retype(DF)
+        _df.get(_func)
+        dataframe[_func] = DF[_func]
 
 
 if __name__ == "__main__":
@@ -83,10 +81,16 @@ if __name__ == "__main__":
     _to = "{}Z".format(datetime.datetime.utcnow().isoformat())
     data = m.fetch_ohlc("EUR_USD", "M15", t_to="2021-03-05T06:45:00.00Z", count=1000)
     df = pd.DataFrame(data)
+    m.moving_average(df, 9)
+    m.moving_average(df, 20)
+    m.moving_average(df, 50)
+    m.moving_average(df, 200)
     last_time = df.iloc[-1]["datetime"]
     data = m.fetch_ohlc("EUR_USD", "M15", t_from=last_time, includeFirst=False)
     df2 = pd.DataFrame(data)
-    df = pd.concat([df, df2])
+    df = pd.concat([df, df2], ignore_index=True)
+    df = df.tail(500)
+    df.reset_index(drop=True, inplace=True)
     m.moving_average(df, 9)
     m.moving_average(df, 20)
     m.moving_average(df, 50)
