@@ -1,13 +1,27 @@
 {
     "symbols": {
 
-
         "GBP_USD": {
-            "qty": 1,
-            "stopLossAfter": 0.25,
-            "takeProfit": 0.5,
-            "precision": 3,
+            "qty": 10,
+            "stopLoss": 0.005,
+            "precision": 5,
             "granularity": "D"
+        },
+
+        "EUR_USD": {
+            "qty": 10,
+            "takeProfit": 0.005,
+            "stopLoss": 0.005,
+            "precision": 5,
+            "granularity": "M15"
+        },
+
+        "AUD_USD": {
+            "qty": 10,
+            "takeProfit": 0.075,
+            "stopLoss": 0.01,
+            "precision": 5,
+            "granularity": "H1"
         }
     }
 }

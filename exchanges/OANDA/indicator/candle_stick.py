@@ -70,6 +70,15 @@ class Candles:
         _df.get(_func)
         dataframe[_func] = DF[_func]
 
+    @staticmethod
+    def macd(dataframe, a=9, b=12, c=26, source="close"):
+        _df = dataframe.copy()
+        _df["MA_Fast"] = _df[source].ewm(span=b, min_periods=b).mean()
+        _df["MA_Slow"] = _df[source].ewm(span=c, min_periods=c).mean()
+        dataframe["macd"] = _df["MA_Fast"] - _df["MA_Slow"]
+        dataframe["macd_sig"] = dataframe["macd"].ewm(span=a, min_periods=a).mean()
+        dataframe["macdh"] = dataframe["macd"] - dataframe["macd_sig"]
+
 
 if __name__ == "__main__":
     with open('../prod/key.json', 'r') as f:
