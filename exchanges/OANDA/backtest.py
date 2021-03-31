@@ -52,11 +52,11 @@ def fetch_ohlc(symbol, granularity, count=500, t_from=None, t_to=None, align_tz=
 
 def dump_to_json_file():
     data = []
-    symbol = "EUR_JPY"
-    granularity = "M15"
+    symbol = "EUR_CAD"
+    granularity = "D"
     while True:
         if len(data) == 0:
-            t_from = "2020-03-01T00:00:00.00Z"
+            t_from = "2017-03-01T00:00:00.00Z"
             d = fetch_ohlc(symbol, granularity, t_from=t_from, count=1000)
         else:
             t_from = data[-1]["datetime"]
@@ -65,7 +65,7 @@ def dump_to_json_file():
             break
         data.extend(d)
 
-    with open("data/{}_1year_{}".format(symbol.lower(), granularity), "w") as f:
+    with open("data/{}_4year_{}".format(symbol.lower(), granularity), "w") as f:
         json.dump(data, f, indent=4)
 
 
@@ -108,6 +108,108 @@ def macd(dataframe, a=9, b=12, c=26, source="close", slope=False):
 
 
 # ----- Fixed -----
+def backtest_eur_jpy_H1():
+    df = pd.read_json("data/eur_jpy_2year_H1")
+    df["day"] = (df["datetime"].dt.day_name())
+    macd(df, a=9, b=12, c=26)
+    df.dropna(inplace=True)
+    point = "close"
+    m = [20, 50]
+    for _t in m:
+        moving_average(df, _t, source=point)
+    ma = ["%s_%s_sma" % (point, _m) for _m in m]
+
+    # _df = pd.DataFrame(df.iloc[m[-1]:])
+    _df = pd.DataFrame(df.iloc[m[-1]:])
+    start_hour = 7
+    end_hour = 14
+    _df["buy"] = (_df[ma[0]].shift() > _df[ma[1]].shift()) & (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0) & (
+            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    # _df["trend_low"] = (_df["macdh"] < 0) & (_df["macdh"].shift() >= 0) & (
+    #         _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    _df["sell"] = (_df[ma[0]].shift() < _df[ma[1]].shift()) & (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0) & (
+            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    # _df["trend_high"] = (_df["macdh"] > 0) & (_df["macdh"].shift() <= 0) & (
+    #         _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    df = _df
+
+    buy = {}
+    sell = {}
+    trades = []
+    df.reset_index(drop=True, inplace=True)
+    tp1 = 0.25
+    tp2 = 0.75  # or 0.01
+    sl = -0.75
+    b_sl = None
+    s_sl = None
+    for i in range(1, len(df)):
+        if len(buy) == 0 and df["buy"][i - 1] == True:
+            buy["entry_price"] = df["open"][i]
+            buy["entry_row"] = i
+            buy["open_time"] = df["datetime"][i]
+            b_sl = sl
+        if len(sell) == 0 and df["sell"][i - 1] == True:
+            sell["entry_price"] = df["open"][i]
+            sell["entry_row"] = i
+            sell["open_time"] = df["datetime"][i]
+            s_sl = sl
+
+        if len(buy) != 0:
+            if df["sell"][i - 1] == True:
+                buy["exit_price"] = df["open"][i]
+            elif df["low"][i] - buy["entry_price"] <= b_sl:
+                buy["exit_price"] = buy["entry_price"] + b_sl
+            elif df["high"][i] - buy["entry_price"] >= tp2:
+                buy["exit_price"] = buy["entry_price"] + tp2
+                b_sl = 0
+            elif df["high"][i] - buy["entry_price"] >= tp1:
+                b_sl = 0
+
+            if "exit_price" in buy:
+                if b_sl == 0:
+                    buy["exit_price"] = (buy["exit_price"] + buy["entry_price"] + tp1) / 2
+                buy["exit_row"] = i
+                buy["pnl"] = buy["exit_price"] - buy["entry_price"]
+                buy["period"] = buy["exit_row"] - buy["entry_row"]
+                buy["side"] = "buy"
+                buy["close_time"] = df["datetime"][i]
+                buy["day"] = df["day"][buy["entry_row"]]
+                trades.append(buy)
+                buy = {}
+
+        if len(sell) != 0:
+            if df["buy"][i - 1] == True:
+                sell["exit_price"] = df["open"][i]
+            elif sell["entry_price"] - df["high"][i] <= s_sl:
+                sell["exit_price"] = sell["entry_price"] - s_sl
+            elif sell["entry_price"] - df["low"][i] >= tp2:
+                sell["exit_price"] = sell["entry_price"] - tp2
+                s_sl = 0
+            elif sell["entry_price"] - df["low"][i] >= tp1:
+                s_sl = 0
+
+            if "exit_price" in sell:
+                if s_sl == 0:
+                    sell["exit_price"] = (sell["exit_price"] + sell["entry_price"] - tp1) / 2
+                sell["exit_row"] = i
+                sell["pnl"] = sell["entry_price"] - sell["exit_price"]
+                sell["period"] = sell["exit_row"] - sell["entry_row"]
+                sell["side"] = "sell"
+                sell["close_time"] = df["datetime"][i]
+                sell["day"] = df["day"][sell["entry_row"]]
+                trades.append(sell)
+                sell = {}
+
+    trades_df = pd.DataFrame(trades)
+    print(sum(trades_df["pnl"] - 0.00028))
+    loss_trades = trades_df[trades_df["pnl"] < 0]
+    print("Total trades: %d" % len(trades_df))
+    print("Profit trades: %d" % len(trades_df[trades_df["pnl"] > 0]))
+    print("Loss trades: %d" % len(loss_trades))
+
+
+# ----- Fixed -----
+# There is another for H1 below
 def backtest_gbp_usd_d():
     df = pd.read_json("data/gbp_usd_4year_D")
     df["vratio"] = df["volume"] / df["volume"].shift()
@@ -136,7 +238,8 @@ def backtest_gbp_usd_d():
             sell["entry_price"] = df["open"][i]
             sell["entry_row"] = i
 
-        if len(buy) != 0 and (df["exit_buy"][i - 1] == True or df["sell"][i - 1] == True or df["close"][i - 1] - buy["entry_price"] < sl):
+        if len(buy) != 0 and (df["exit_buy"][i - 1] == True or df["sell"][i - 1] == True or df["close"][i - 1] - buy[
+            "entry_price"] < sl):
             buy["exit_price"] = df["open"][i]
             buy["exit_row"] = i
             buy["pnl"] = buy["exit_price"] - buy["entry_price"]
@@ -145,7 +248,9 @@ def backtest_gbp_usd_d():
             trades.append(buy)
             buy = {}
 
-        if len(sell) != 0 and (df["exit_sell"][i - 1] == True or df["buy"][i - 1] == True or sell["entry_price"] - df["close"][i - 1] < sl):
+        if len(sell) != 0 and (
+                df["exit_sell"][i - 1] == True or df["buy"][i - 1] == True or sell["entry_price"] - df["close"][
+            i - 1] < sl):
             sell["exit_price"] = df["open"][i]
             sell["exit_row"] = i
             sell["pnl"] = sell["entry_price"] - sell["exit_price"]
@@ -175,13 +280,13 @@ def backtest_eur_usd_M15():
     # Drop the first 200 rows as the average is not accurate
     _df = pd.DataFrame(df.iloc[m[-1]:])
     _df["buy"] = (_df[ma[-1]].shift() > _df[ma[-2]].shift()) & (
-                _df[ma[-1]] < _df[ma[-2]]) & (
-                                _df[ma[-2]] < _df[ma[-3]]) & (_df[ma[-3]] < _df[ma[-4]])
+            _df[ma[-1]] < _df[ma[-2]]) & (
+                         _df[ma[-2]] < _df[ma[-3]]) & (_df[ma[-3]] < _df[ma[-4]])
     _df["trend_high"] = (_df[ma[-1]] < _df[ma[-2]]) & (_df[ma[-2]] < _df[ma[-3]]) & (
             _df[ma[-2]] < _df[ma[-4]])
     _df["sell"] = (_df[ma[-1]].shift() < _df[ma[-2]].shift()) & (
-                _df[ma[-1]] > _df[ma[-2]]) & (
-                                 _df[ma[-2]] > _df[ma[-3]]) & (_df[ma[-3]] > _df[ma[-4]])
+            _df[ma[-1]] > _df[ma[-2]]) & (
+                          _df[ma[-2]] > _df[ma[-3]]) & (_df[ma[-3]] > _df[ma[-4]])
     _df["trend_low"] = (_df[ma[-1]] > _df[ma[-2]]) & (_df[ma[-2]] > _df[ma[-3]]) & (
             _df[ma[-2]] > _df[ma[-4]])
 
@@ -258,9 +363,9 @@ def backtest_aud_usd_H1():
 
     _df = pd.DataFrame(df.iloc[m[-1]:])
     _df["buy"] = (_df[ma[0]].shift() > _df[ma[1]].shift()) & (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0)
-    #_df["exit_buy"] = (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0)
+    # _df["exit_buy"] = (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0)
     _df["sell"] = (_df[ma[0]].shift() < _df[ma[1]].shift()) & (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0)
-    #_df["exit_sell"] = (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0)
+    # _df["exit_sell"] = (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0)
     df = _df
 
     buy = {}
@@ -268,31 +373,35 @@ def backtest_aud_usd_H1():
     trades = []
     df.reset_index(drop=True, inplace=True)
     # TODO: TP1 at 0.075 and TP2 at 0.015
-    tp = 0.075  # or 0.01
+    tp1 = 0.0075
+    tp2 = 0.01  # or 0.01
     sl = -0.01
     for i in range(1, len(df)):
         if len(buy) == 0 and df["buy"][i - 1] == True:
             buy["entry_price"] = df["open"][i]
             buy["entry_row"] = i
             buy["open_time"] = df["datetime"][i]
-            b_stop = df["open"][i - 1]
+            b_sl = sl
         if len(sell) == 0 and df["sell"][i - 1] == True:
             sell["entry_price"] = df["open"][i]
             sell["entry_row"] = i
             sell["open_time"] = df["datetime"][i]
-            s_stop = df["open"][i - 1]
+            s_sl = sl
 
         if len(buy) != 0:
-            # if df["low"][i] - buy["entry_price"] <= sl:
-            #     buy["exit_price"] = buy["entry_price"] + sl
-            if df["close"][i - 1] - buy["entry_price"] <= sl:
+            if i != buy["entry_row"] and df["sell"][i - 1] == True:
                 buy["exit_price"] = df["open"][i]
-            elif df["sell"][i - 1] == True:
+            elif df["close"][i - 1] - buy["entry_price"] <= b_sl:
                 buy["exit_price"] = df["open"][i]
-            elif df["high"][i] - buy["entry_price"] >= tp:
-                buy["exit_price"] = buy["entry_price"] + tp
+            elif df["high"][i] - buy["entry_price"] >= tp2:
+                buy["exit_price"] = buy["entry_price"] + tp2
+                b_sl = 0
+            elif df["high"][i] - buy["entry_price"] >= tp1:
+                b_sl = 0
 
             if "exit_price" in buy:
+                if b_sl == 0:
+                    buy["exit_price"] = (buy["exit_price"] + buy["entry_price"] + tp1) / 2
                 buy["exit_row"] = i
                 buy["pnl"] = buy["exit_price"] - buy["entry_price"]
                 buy["period"] = buy["exit_row"] - buy["entry_row"]
@@ -302,16 +411,19 @@ def backtest_aud_usd_H1():
                 buy = {}
 
         if len(sell) != 0:
-            # if sell["entry_price"] - df["high"][i] <= sl:
-            #     sell["exit_price"] = sell["entry_price"] - sl
-            if sell["entry_price"] - df["close"][i - 1] <= sl:
+            if i != sell["entry_row"] and df["buy"][i - 1] == True:
                 sell["exit_price"] = df["open"][i]
-            elif df["buy"][i - 1] == True:
+            elif sell["entry_price"] - df["close"][i - 1] <= s_sl:
                 sell["exit_price"] = df["open"][i]
-            elif sell["entry_price"] - df["low"][i] >= tp:
-                sell["exit_price"] = sell["entry_price"] - tp
+            elif sell["entry_price"] - df["low"][i] >= tp2:
+                sell["exit_price"] = sell["entry_price"] - tp2
+                s_sl = 0
+            elif sell["entry_price"] - df["low"][i] >= tp1:
+                s_sl = 0
 
             if "exit_price" in sell:
+                if s_sl == 0:
+                    sell["exit_price"] = (sell["exit_price"] + sell["entry_price"] - tp1) / 2
                 sell["exit_row"] = i
                 sell["pnl"] = sell["entry_price"] - sell["exit_price"]
                 sell["period"] = sell["exit_row"] - sell["entry_row"]
@@ -328,11 +440,9 @@ def backtest_aud_usd_H1():
     print("Loss trades: %d" % len(trades_df[trades_df["pnl"] < 0]))
 
 
-##########################################################################################
-# TODO
-def backtest_usd_jpy_H1():
-    df = pd.read_json("data/usd_jpy_4year_D")
-    # df["vratio"] = df["volume"] / df["volume"].shift()
+def backtest_gbp_usd_H1():
+    df = pd.read_json("data/gbp_usd_2year_H1")
+    df["day"] = (df["datetime"].dt.day_name())
     macd(df, a=9, b=12, c=26)
     df.dropna(inplace=True)
     point = "close"
@@ -342,48 +452,152 @@ def backtest_usd_jpy_H1():
     ma = ["%s_%s_sma" % (point, _m) for _m in m]
 
     _df = pd.DataFrame(df.iloc[m[-1]:])
-    _df["buy"] = (_df[ma[0]].shift() > _df[ma[1]].shift()) & (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0)
-    # _df["exit_buy"] = (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0)
-    _df["sell"] = (_df[ma[0]].shift() < _df[ma[1]].shift()) & (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0)
-    # _df["exit_sell"] = (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0)
+    start_hour = 0
+    end_hour = 24
+    _df["buy"] = (_df[ma[0]].shift() > _df[ma[1]].shift()) & (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0) & (
+            (_df["datetime"].dt.hour >= start_hour) | (_df["datetime"].dt.hour <= end_hour))
+    _df["sell"] = (_df[ma[0]].shift() < _df[ma[1]].shift()) & (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0) & (
+            (_df["datetime"].dt.hour >= start_hour) | (_df["datetime"].dt.hour <= end_hour))
+
+    _df["trend_high"] = (_df["macdh"] > 0) & (_df["macdh"].shift() <= 0) & (
+            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    _df["trend_low"] = (_df["macdh"] < 0) & (_df["macdh"].shift() >= 0) & (
+            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+
+    _df["mm"] = _df["macdh"] > 0
+
+    df = _df
+    df.reset_index(drop=True, inplace=True)
+
+    buy = {}
+    sell = {}
+    trades = []
+    tp1 = 0.005
+    tp2 = 0.005  # or 0.01
+    sl = -0.005
+    b_sl = None
+    s_sl = None
+    for i in range(1, len(df)):
+        if len(buy) == 0 and df["buy"][i - 1] == True:
+            buy["entry_price"] = df["open"][i]
+            buy["entry_row"] = i
+            buy["open_time"] = df["datetime"][i]
+            b_sl = sl
+        if len(sell) == 0 and df["sell"][i - 1] == True:
+            sell["entry_price"] = df["open"][i]
+            sell["entry_row"] = i
+            sell["open_time"] = df["datetime"][i]
+            s_sl = sl
+
+        if len(buy) != 0:
+            if i != buy["entry_row"] and df["sell"][i - 1] == True:
+                buy["exit_price"] = df["open"][i]
+            elif (df[buy["entry_row"]:i]["mm"].values.sum() < (~df[buy["entry_row"]:i]["mm"]).values.sum()) or (
+                    df["trend_low"][i - 1] == True and i - buy["entry_row"] <= 5):
+                buy["exit_price"] = df["open"][i]
+            elif df["low"][i] - buy["entry_price"] <= b_sl:
+                if b_sl != sl:
+                    buy["exit_price"] = (buy["entry_price"] + tp1 + buy["entry_price"]) / 2
+                else:
+                    buy["exit_price"] = buy["entry_price"] + b_sl
+            elif df["high"][i] - buy["entry_price"] >= tp2:
+                buy["exit_price"] = (buy["entry_price"] + tp1 + buy["entry_price"] + tp2) / 2
+            elif df["high"][i] - buy["entry_price"] >= tp1:
+                b_sl = 0
+
+            if "exit_price" in buy:
+                buy["exit_row"] = i
+                buy["pnl"] = buy["exit_price"] - buy["entry_price"]
+                buy["period"] = buy["exit_row"] - buy["entry_row"]
+                buy["side"] = "buy"
+                buy["close_time"] = df["datetime"][i]
+                buy["day"] = df["day"][buy["entry_row"]]
+                trades.append(buy)
+                buy = {}
+
+        if len(sell) != 0:
+            if i != sell["entry_row"] and df["buy"][i - 1] == True:
+                sell["exit_price"] = df["open"][i]
+            elif (df[sell["entry_row"]:i]["mm"].values.sum() > (~df[sell["entry_row"]:i]["mm"]).values.sum()) or (
+                    df["trend_high"][i - 1] == True and i - sell["entry_row"] <= 5):
+                sell["exit_price"] = df["open"][i]
+            elif sell["entry_price"] - df["high"][i] <= s_sl:
+                if s_sl != sl:
+                    sell["exit_price"] = (sell["entry_price"] - tp1 + sell["entry_price"]) / 2
+                else:
+                    sell["exit_price"] = sell["entry_price"] - s_sl
+            elif sell["entry_price"] - df["low"][i] >= tp2:
+                sell["exit_price"] = (sell["entry_price"] - tp1 + sell["entry_price"] - tp2) / 2
+            elif sell["entry_price"] - df["low"][i] >= tp1:
+                s_sl = 0
+
+            if "exit_price" in sell:
+                sell["exit_row"] = i
+                sell["pnl"] = sell["entry_price"] - sell["exit_price"]
+                sell["period"] = sell["exit_row"] - sell["entry_row"]
+                sell["side"] = "sell"
+                sell["close_time"] = df["datetime"][i]
+                sell["day"] = df["day"][sell["entry_row"]]
+                trades.append(sell)
+                sell = {}
+
+    trades_df = pd.DataFrame(trades)
+    print(sum(trades_df["pnl"] - 0.00026))
+    loss_trades = trades_df[trades_df["pnl"] < 0]
+    print("Total trades: %d" % len(trades_df))
+    print("Profit trades: %d" % len(trades_df[trades_df["pnl"] > 0]))
+    print("Loss trades: %d" % len(loss_trades))
+
+
+# ----- Fixed -----
+def backtest_usd_jpy_H1():
+    df = pd.read_json("data/usd_jpy_2year_H1")
+    macd(df, a=10, b=20, c=50)
+    df.dropna(inplace=True)
+    point = "close"
+    m = [20, 50]
+    for _t in m:
+        moving_average(df, _t, source=point)
+    ma = ["%s_%s_sma" % (point, _m) for _m in m]
+
+    _df = pd.DataFrame(df.iloc[m[-1]:])
+    _df["buy"] = (_df["macdh"].shift() <= 0) & (_df["macdh"] >= 0.0001) & (_df[ma[0]].shift() > _df[ma[1]].shift())
+    _df["sell"] = (_df["macdh"].shift() >= 0) & (_df["macdh"] <= -0.0001) & (_df[ma[0]].shift() < _df[ma[1]].shift())
     df = _df
 
     buy = {}
     sell = {}
     trades = []
     df.reset_index(drop=True, inplace=True)
-    tp = 10  # or 0.01
-    sl = -10
-    b_stop = None
-    s_stop = None
-    for i in range(20, len(df)):
-        if len(buy) == 0 and df["buy"][i - 1] == True:# and all(df["macdh"][i-20:i-1] <= 0) is True:
+    tp1 = 0.3
+    tp2 = 0.75
+    sl = -0.75
+    b_sl = None
+    s_sl = None
+    for i in range(1, len(df)):
+        if len(buy) == 0 and df["buy"][i - 1] == True:
             buy["entry_price"] = df["open"][i]
             buy["entry_row"] = i
             buy["open_time"] = df["datetime"][i]
-            b_stop = df["open"][i - 1]
-        if len(sell) == 0 and df["sell"][i - 1] == True:# and all(df["macdh"][i-20:i-1] <= 0) is True:
+            b_sl = sl
+        if len(sell) == 0 and df["sell"][i - 1] == True:
             sell["entry_price"] = df["open"][i]
             sell["entry_row"] = i
             sell["open_time"] = df["datetime"][i]
-            s_stop = df["open"][i - 1]
+            s_sl = sl
 
         if len(buy) != 0:
-
-            if df["close"][i - 1] - buy["entry_price"] <= sl:
-                buy["exit_price"] = df["open"][i]
-
-            elif df["sell"][i - 1] == True:
-                if df["open"][i] <= buy["entry_price"]:
-                    buy["exit_price"] = df["open"][i]
+            if df["low"][i] - buy["entry_price"] <= b_sl:
+                if b_sl != sl:
+                    buy["exit_price"] = (buy["entry_price"] + tp1 + buy["entry_price"]) / 2
                 else:
-                    b_stop = (df["close"][buy["entry_row"]:i].max() + buy["entry_price"]) / 2
-
-            elif b_stop is not None and df["close"][i - 1] <= b_stop:
+                    buy["exit_price"] = buy["entry_price"] + b_sl
+            elif df["sell"][i - 1] == True:
                 buy["exit_price"] = df["open"][i]
-
-            elif df["high"][i] - buy["entry_price"] >= tp:
-                buy["exit_price"] = buy["entry_price"] + tp
+            elif df["high"][i] - buy["entry_price"] >= tp2:
+                buy["exit_price"] = (buy["entry_price"] + tp1 + buy["entry_price"] + tp2) / 2
+            elif df["high"][i] - buy["entry_price"] >= tp1:
+                b_sl = 0
 
             if "exit_price" in buy:
                 buy["exit_row"] = i
@@ -393,119 +607,135 @@ def backtest_usd_jpy_H1():
                 buy["close_time"] = df["datetime"][i]
                 trades.append(buy)
                 buy = {}
-                b_stop = None
 
         if len(sell) != 0:
-
-            if sell["entry_price"] - df["close"][i - 1] <= sl:
-                sell["exit_price"] = df["open"][i]
-
-            elif df["buy"][i - 1] == True:
-                if df["open"][i] >= sell["entry_price"]:
-                    sell["exit_price"] = df["open"][i]
+            if sell["entry_price"] - df["high"][i] <= s_sl:
+                if s_sl != sl:
+                    sell["exit_price"] = (sell["entry_price"] - tp1 + sell["entry_price"]) / 2
                 else:
-                    s_stop = (df["close"][sell["entry_row"]:i].min() + sell["entry_price"]) / 2
-
-            elif s_stop is not None and df["close"][i - 1] >= s_stop:
+                    sell["exit_price"] = sell["entry_price"] - s_sl
+            elif df["buy"][i - 1] == True:
                 sell["exit_price"] = df["open"][i]
-
-            elif df["high"][i] - sell["entry_price"] >= tp:
-                sell["exit_price"] = sell["entry_price"] + tp
-
-            if "exit_price" in sell:
-                sell["exit_row"] = i
-                sell["pnl"] = sell["exit_price"] - sell["entry_price"]
-                sell["period"] = sell["exit_row"] - sell["entry_row"]
-                sell["side"] = "buy"
-                sell["close_time"] = df["datetime"][i]
-                trades.append(sell)
-                sell = {}
-                s_stop = None
-
-    trades_df = pd.DataFrame(trades)
-    print(sum(trades_df["pnl"] - 0.016))
-    loss_trades = trades_df[trades_df["pnl"] < 0]
-    print("Total trades: %d" % len(trades_df))
-    print("Profit trades: %d" % len(trades_df[trades_df["pnl"] > 0]))
-    print("Loss trades: %d" % len(trades_df[trades_df["pnl"] < 0]))
-
-
-# TODO
-def backtest_eur_jpy_H1():
-    df = pd.read_json("data/eur_jpy_2year_H1")
-    point = "close"
-    m = [9, 20, 50, 200]
-    for _t in m:
-        moving_average(df, _t, source=point)
-    ma = ["%s_%s_sma" % (point, _m) for _m in m]
-
-    # Drop the first 200 rows as the average is not accurate
-    _df = pd.DataFrame(df.iloc[m[-1]:])
-    _df["buy"] = (_df[ma[-2]].shift() > _df[ma[-4]].shift()) & (_df[ma[-2]] < _df[ma[-4]])
-    _df["exit_buy"] = (_df[ma[-2]].shift() > _df[ma[-1]].shift()) & (_df[ma[-2]] < _df[ma[-1]])
-
-    _df["sell"] = (_df[ma[-2]].shift() < _df[ma[-4]].shift()) & (_df[ma[-2]] > _df[ma[-4]])
-    _df["exit_sell"] = (_df[ma[-2]].shift() < _df[ma[-1]].shift()) & (_df[ma[-2]] > _df[ma[-1]])
-
-    # _df["trend_high"] = (_df[ma[-1]] < _df[ma[-2]])
-    #
-    # _df["trend_low"] = (_df[ma[-1]] > _df[ma[-2]])
-
-    df = _df
-
-    buy = {}
-    sell = {}
-    trades = []
-    df.reset_index(drop=True, inplace=True)
-    tp = 1.5
-    sl = 1.5 # Not required
-    # df = df.tail(365)
-    # df.reset_index(drop=True, inplace=True)
-    for i in range(1, len(df)):
-        if len(buy) == 0 and df["buy"][i - 1] == True:
-            buy["entry_price"] = df["open"][i]
-            buy["entry_row"] = i
-        if len(sell) == 0 and df["sell"][i - 1] == True:
-            sell["entry_price"] = df["open"][i]
-            sell["entry_row"] = i
-
-        if len(buy) != 0:
-            if buy["entry_price"] - df["low"][i - 1] >= sl:
-                buy["exit_price"] = buy["entry_price"] - sl
-            elif df["high"][i] - buy["entry_price"] >= tp:
-                buy["exit_price"] = buy["entry_price"] + tp
-            elif df["exit_buy"][i - 1] == True or df["sell"][i - 1] == True:
-                buy["exit_price"] = df["open"][i]
-
-            if "exit_price" in buy:
-                buy["exit_row"] = i
-                buy["pnl"] = buy["exit_price"] - buy["entry_price"]
-                buy["period"] = buy["exit_row"] - buy["entry_row"]
-                buy["side"] = "buy"
-                trades.append(buy)
-                buy = {}
-
-        if len(sell) != 0:
-            if df["high"][i - 1] - sell["entry_price"] >= sl:
-                sell["exit_price"] = sell["entry_price"] + sl
-            elif sell["entry_price"] - df["low"][i] >= tp:
-                sell["exit_price"] = sell["entry_price"] - tp
-            elif df["exit_sell"][i - 1] == True or df["buy"][i - 1] == True:
-                sell["exit_price"] = df["open"][i]
+            elif sell["entry_price"] - df["low"][i] >= tp2:
+                sell["exit_price"] = (sell["entry_price"] - tp1 + sell["entry_price"] - tp2) / 2
+            elif sell["entry_price"] - df["low"][i] >= tp1:
+                s_sl = 0
 
             if "exit_price" in sell:
                 sell["exit_row"] = i
                 sell["pnl"] = sell["entry_price"] - sell["exit_price"]
                 sell["period"] = sell["exit_row"] - sell["entry_row"]
                 sell["side"] = "sell"
+                sell["close_time"] = df["datetime"][i]
                 trades.append(sell)
                 sell = {}
 
     trades_df = pd.DataFrame(trades)
-    print(sum(trades_df["pnl"] - 0.026))
+    print(sum(trades_df["pnl"] - 0.016))
+    loss_trades = trades_df[trades_df["pnl"] < 0]
     print("Total trades: %d" % len(trades_df))
     print("Profit trades: %d" % len(trades_df[trades_df["pnl"] > 0]))
-    print("Loss trades: %d" % len(trades_df[trades_df["pnl"] < 0]))
+    print("Loss trades: %d" % len(loss_trades))
+
+
+def test():
+    df = pd.read_json("data/eur_usd_2year_H1")
+    df["day"] = (df["datetime"].dt.day_name())
+    macd(df, a=9, b=12, c=26)
+    df.dropna(inplace=True)
+    point = "close"
+    m = [20, 50]
+    for _t in m:
+        moving_average(df, _t, source=point)
+    ma = ["%s_%s_sma" % (point, _m) for _m in m]
+
+    # _df = pd.DataFrame(df.iloc[m[-1]:])
+    _df = pd.DataFrame(df.iloc[m[-1]:])
+    start_hour = 7
+    end_hour = 14
+    _df["buy"] = (_df[ma[0]].shift() > _df[ma[1]].shift()) & (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0) & (
+            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    # _df["trend_low"] = (_df["macdh"] < 0) & (_df["macdh"].shift() >= 0) & (
+    #         _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    _df["sell"] = (_df[ma[0]].shift() < _df[ma[1]].shift()) & (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0) & (
+            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    # _df["trend_high"] = (_df["macdh"] > 0) & (_df["macdh"].shift() <= 0) & (
+    #         _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
+    df = _df
+
+    buy = {}
+    sell = {}
+    trades = []
+    df.reset_index(drop=True, inplace=True)
+    tp1 = 0.005
+    tp2 = 0.01  # or 0.01
+    sl = -0.01
+    b_sl = None
+    s_sl = None
+    for i in range(1, len(df)):
+        if len(buy) == 0 and df["buy"][i - 1] == True:
+            buy["entry_price"] = df["open"][i]
+            buy["entry_row"] = i
+            buy["open_time"] = df["datetime"][i]
+            b_sl = sl
+        if len(sell) == 0 and df["sell"][i - 1] == True:
+            sell["entry_price"] = df["open"][i]
+            sell["entry_row"] = i
+            sell["open_time"] = df["datetime"][i]
+            s_sl = sl
+
+        if len(buy) != 0:
+            if df["sell"][i - 1] == True:
+                buy["exit_price"] = df["open"][i]
+            elif df["low"][i] - buy["entry_price"] <= b_sl:
+                buy["exit_price"] = buy["entry_price"] + b_sl
+            elif df["high"][i] - buy["entry_price"] >= tp2:
+                buy["exit_price"] = buy["entry_price"] + tp2
+                b_sl = 0
+            elif df["high"][i] - buy["entry_price"] >= tp1:
+                b_sl = 0
+
+            if "exit_price" in buy:
+                if b_sl == 0:
+                    buy["exit_price"] = (buy["exit_price"] + buy["entry_price"] + tp1) / 2
+                buy["exit_row"] = i
+                buy["pnl"] = buy["exit_price"] - buy["entry_price"]
+                buy["period"] = buy["exit_row"] - buy["entry_row"]
+                buy["side"] = "buy"
+                buy["close_time"] = df["datetime"][i]
+                buy["day"] = df["day"][buy["entry_row"]]
+                trades.append(buy)
+                buy = {}
+
+        if len(sell) != 0:
+            if df["buy"][i - 1] == True:
+                sell["exit_price"] = df["open"][i]
+            elif sell["entry_price"] - df["high"][i] <= s_sl:
+                sell["exit_price"] = sell["entry_price"] - s_sl
+            elif sell["entry_price"] - df["low"][i] >= tp2:
+                sell["exit_price"] = sell["entry_price"] - tp2
+                s_sl = 0
+            elif sell["entry_price"] - df["low"][i] >= tp1:
+                s_sl = 0
+
+            if "exit_price" in sell:
+                if s_sl == 0:
+                    sell["exit_price"] = (sell["exit_price"] + sell["entry_price"] - tp1) / 2
+                sell["exit_row"] = i
+                sell["pnl"] = sell["entry_price"] - sell["exit_price"]
+                sell["period"] = sell["exit_row"] - sell["entry_row"]
+                sell["side"] = "sell"
+                sell["close_time"] = df["datetime"][i]
+                sell["day"] = df["day"][sell["entry_row"]]
+                trades.append(sell)
+                sell = {}
+
+    trades_df = pd.DataFrame(trades)
+    print(sum(trades_df["pnl"] - 0.00028))
+    loss_trades = trades_df[trades_df["pnl"] < 0]
+    print("Total trades: %d" % len(trades_df))
+    print("Profit trades: %d" % len(trades_df[trades_df["pnl"] > 0]))
+    print("Loss trades: %d" % len(loss_trades))
 
 
 if __name__ == "__main__":
@@ -516,5 +746,8 @@ if __name__ == "__main__":
     # client = oandapyV20.API(access_token=token, environment="live")
     # dump_to_json_file()
 
-    backtest_gbp_usd_d()
-
+    # backtest_eur_jpy_H1()
+    # backtest_usd_jpy_H1()
+    backtest_aud_usd_H1()
+    # test()
+    # backtest_eur_usd_M15()

@@ -1,13 +1,6 @@
 {
     "symbols": {
 
-        "GBP_USD": {
-            "qty": 10,
-            "stopLoss": 0.005,
-            "precision": 5,
-            "granularity": "D"
-        },
-
         "EUR_USD": {
             "qty": 10,
             "takeProfit": 0.005,
@@ -18,9 +11,28 @@
 
         "AUD_USD": {
             "qty": 10,
-            "takeProfit": 0.075,
+            "takeProfit1": 0.0075,
+            "takeProfit2": 0.01,
             "stopLoss": 0.01,
             "precision": 5,
+            "granularity": "H1"
+        },
+
+        "EUR_JPY": {
+            "qty": 10,
+            "takeProfit1": 0.25,
+            "takeProfit2": 0.75,
+            "stopLoss": 0.75,
+            "precision": 3,
+            "granularity": "H1"
+        },
+
+        "USD_JPY": {
+            "qty": 10,
+            "takeProfit1": 0.3,
+            "takeProfit2": 0.75,
+            "stopLoss": 0.75,
+            "precision": 3,
             "granularity": "H1"
         }
     }

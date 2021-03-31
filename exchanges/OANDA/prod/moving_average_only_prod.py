@@ -163,12 +163,12 @@ def open_positions():
     return result
 
 
-def close_positions(instrument, side=None):
+def close_positions(instrument, side=None, ratio=1.0):
     temp = o_positions.get(instrument, {})
     if len(temp) == 0:
         return
-    l_units = abs(int(temp["long"]["units"]))
-    s_units = abs(int(temp["short"]["units"]))
+    l_units = abs(int(temp["long"]["units"] * ratio))
+    s_units = abs(int(temp["short"]["units"] * ratio))
     if side == 'long':
         s_units = 0
     elif side == 'short':
@@ -235,96 +235,90 @@ def clear_symbol(instrument):
     close_positions(instrument)
 
 
-class FxGBPUSD:
-    def __init__(self, instrument, config):
-        self.instrument = instrument
-        self.config = config
-        self.df = None
-        self.max_df_rows = 1000
-        self.signal_df = None
-
-    # GBP_USD
-    def clean(self, side=None):
-        # Close positions
-        close_positions(self.instrument, side=side)
-        # Clear first order reference
-        if side in ('long', None):
-            pass
-        if side in ('short', None):
-            pass
-
-    # GBP_USD
-    def update_candles(self):
-        new_candle = False
-        granularity = self.config["granularity"]
-        if self.df is None:
-            _to = "{}Z".format(datetime.utcnow().isoformat())
-            data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
-            self.df = pd.DataFrame(data)
-            self.df["datetime"] = pd.to_datetime(self.df["datetime"])
-            new_candle = True
-        else:
-            last_time = self.df.iloc[-1]["datetime"]
-            diff = datetime.now(timezone.utc) - last_time.to_pydatetime()
-            if diff.days == 0:
-                return
-            _from = last_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-            data = candle_client.fetch_ohlc(self.instrument, granularity, t_from=_from, includeFirst=False)
-            if len(data) > 0:
-                _df = pd.DataFrame(data)
-                _df["datetime"] = pd.to_datetime(_df["datetime"])
-                self.df = pd.concat([self.df, _df], ignore_index=True)
-                self.df = self.df.tail(self.max_df_rows)
-                self.df.reset_index(drop=True, inplace=True)
-                new_candle = True
-
-        if new_candle is False:
-            return
-
-        # Update signals
-        _df = pd.DataFrame(self.df)
-        _df["buy_signal"] = (_df["volume"] > 80000) & (_df["close"] > _df["open"])
-        _df["sell_signal"] = (_df["volume"] > 80000) & (_df["open"] > _df["close"])
-        _df["exit_buy"] = (_df["close"] < _df["open"]) & (_df["close"].shift() < _df["open"].shift())
-        _df["exit_sell"] = (_df["close"] > _df["open"]) & (_df["close"].shift() > _df["open"].shift())
-
-        self.signal_df = _df
-
-    # GBP_USD
-    def run(self, o_pos, ltp):
-        l_price = None
-        s_price = None
-        l_units = 0
-        s_units = 0
-        if len(o_pos) > 0:
-            l_units = abs(int(o_pos["long"]["units"]))
-            s_units = abs(int(o_pos["short"]["units"]))
-            if l_units != 0:
-                l_price = float(o_pos['long']['averagePrice'])
-            if s_units != 0:
-                s_price = float(o_pos['short']['averagePrice'])
-
-        _df = self.signal_df.iloc[-1]
-        if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] is True:
-                log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
-                market_order(self.instrument, self.config['qty'])
-            if s_units == 0 and _df["sell_signal"] is True:
-                log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
-                market_order(self.instrument, self.config['qty'] * -1)
-            return
-
-        if l_units > 0:
-            if _df["exit_buy"] == True or _df["sell"] == True or l_price - self.config["stopLoss"] < _df["close"]:
-                log.info("%s: Closing LONG position" % self.instrument)
-                self.clean(side='long')
-                return
-
-        if s_units > 0:
-            if _df["exit_sell"] == True or _df["buy"] == True or s_price + self.config["stopLoss"] > _df["close"]:
-                log.info("%s: Closing SHORT position" % self.instrument)
-                self.clean(side='short')
-                return
+# class FxGBPUSD:
+#     def __init__(self, instrument, config):
+#         self.instrument = instrument
+#         self.config = config
+#         self.df = None
+#         self.max_df_rows = 1000
+#         self.signal_df = None
+#
+#     # GBP_USD
+#     def clean(self, side=None):
+#         # Close positions
+#         close_positions(self.instrument, side=side)
+#         # Clear first order reference
+#         if side in ('long', None):
+#             pass
+#         if side in ('short', None):
+#             pass
+#
+#     # GBP_USD
+#     def update_candles(self):
+#         granularity = self.config["granularity"]
+#         if self.df is None:
+#             _to = "{}Z".format(datetime.utcnow().isoformat())
+#             data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
+#             self.df = pd.DataFrame(data)
+#             self.df["datetime"] = pd.to_datetime(self.df["datetime"])
+#         else:
+#             last_time = self.df.iloc[-1]["datetime"]
+#             diff = datetime.now(timezone.utc) - last_time.to_pydatetime()
+#             if diff.days == 0:
+#                 return
+#             _from = last_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+#             data = candle_client.fetch_ohlc(self.instrument, granularity, t_from=_from, includeFirst=False)
+#             if len(data) > 0:
+#                 _df = pd.DataFrame(data)
+#                 _df["datetime"] = pd.to_datetime(_df["datetime"])
+#                 self.df = pd.concat([self.df, _df], ignore_index=True)
+#                 self.df = self.df.tail(self.max_df_rows)
+#                 self.df.reset_index(drop=True, inplace=True)
+#
+#         # Update signals
+#         _df = pd.DataFrame(self.df)
+#         _df["buy_signal"] = (_df["volume"] > 80000) & (_df["close"] > _df["open"])
+#         _df["sell_signal"] = (_df["volume"] > 80000) & (_df["open"] > _df["close"])
+#         _df["exit_buy"] = (_df["close"] < _df["open"]) & (_df["close"].shift() < _df["open"].shift())
+#         _df["exit_sell"] = (_df["close"] > _df["open"]) & (_df["close"].shift() > _df["open"].shift())
+#
+#         self.signal_df = _df
+#
+#     # GBP_USD
+#     def run(self, o_pos, ltp):
+#         l_price = None
+#         s_price = None
+#         l_units = 0
+#         s_units = 0
+#         if len(o_pos) > 0:
+#             l_units = abs(int(o_pos["long"]["units"]))
+#             s_units = abs(int(o_pos["short"]["units"]))
+#             if l_units != 0:
+#                 l_price = float(o_pos['long']['averagePrice'])
+#             if s_units != 0:
+#                 s_price = float(o_pos['short']['averagePrice'])
+#
+#         _df = self.signal_df.iloc[-1]
+#         if l_units == 0 or s_units == 0:
+#             if l_units == 0 and _df["buy_signal"] is True:
+#                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
+#                 market_order(self.instrument, self.config['qty'])
+#             if s_units == 0 and _df["sell_signal"] is True:
+#                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
+#                 market_order(self.instrument, self.config['qty'] * -1)
+#             return
+#
+#         if l_units > 0:
+#             if _df["exit_buy"] == True or _df["sell"] == True or l_price - self.config["stopLoss"] < _df["close"]:
+#                 log.info("%s: Closing LONG position" % self.instrument)
+#                 self.clean(side='long')
+#                 return
+#
+#         if s_units > 0:
+#             if _df["exit_sell"] == True or _df["buy"] == True or s_price + self.config["stopLoss"] > _df["close"]:
+#                 log.info("%s: Closing SHORT position" % self.instrument)
+#                 self.clean(side='short')
+#                 return
 
 
 class FxEURUSD:
@@ -347,14 +341,12 @@ class FxEURUSD:
 
     # EUR_USD
     def update_candles(self):
-        new_candle = False
         granularity = self.config["granularity"]
         if self.df is None:
             _to = "{}Z".format(datetime.utcnow().isoformat())
             data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
             self.df = pd.DataFrame(data)
             self.df["datetime"] = pd.to_datetime(self.df["datetime"])
-            new_candle = True
         else:
             last_time = self.df.iloc[-1]["datetime"]
             diff = datetime.now(timezone.utc) - last_time.to_pydatetime()
@@ -368,10 +360,6 @@ class FxEURUSD:
                 self.df = pd.concat([self.df, _df], ignore_index=True)
                 self.df = self.df.tail(self.max_df_rows)
                 self.df.reset_index(drop=True, inplace=True)
-                new_candle = True
-
-        if new_candle is False:
-            return
 
         candle_client.moving_average(self.df, 9)
         candle_client.moving_average(self.df, 20)
@@ -459,20 +447,25 @@ class FxAUDUSD:
         self.df = None
         self.max_df_rows = 1000
         self.signal_df = None
+        self.b_stop_loss = config["stopLoss"]
+        self.s_stop_loss = config["stopLoss"]
+        self.b_start = ""
+        self.s_start = ""
 
     # AUD_USD
-    def clean(self, side=None):
+    def clean(self, side=None, ratio=1.0):
         # Close positions
-        close_positions(self.instrument, side=side)
+        close_positions(self.instrument, side=side, ratio=ratio)
         # Clear first order reference
         if side in ('long', None):
-            pass
+            self.b_stop_loss = self.config["stopLoss"]
+            self.b_start = ""
         if side in ('short', None):
-            pass
+            self.s_stop_loss = self.config["stopLoss"]
+            self.s_start = ""
 
     # AUD_USD
     def update_candles(self):
-        new_candle = False
         granularity = self.config["granularity"]
         if self.df is None:
             _to = "{}Z".format(datetime.utcnow().isoformat())
@@ -525,13 +518,142 @@ class FxAUDUSD:
             if l_units == 0 and _df["buy_signal"] is True:
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
+                self.b_stop_loss = self.config["stopLoss"]
+                self.b_start = _df["datetime"]
             if s_units == 0 and _df["sell_signal"] is True:
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
+                self.s_stop_loss = self.config["stopLoss"]
+                self.s_start = _df["datetime"]
             return
 
         if l_units > 0 and ltp is not None:
-            if l_price - _df["close"] >= self.config["stopLoss"]:
+            if l_price - _df["close"] >= self.b_stop_loss:
+                log.info("%s: Closing LONG position for stop loss." % self.instrument)
+                self.clean(side='long')
+                return
+            elif self.b_start != _df["datetime"] and _df["sell_signal"] == True:
+                log.info("%s: Closing LONG position on short signal." % self.instrument)
+                self.clean(side='long')
+                return
+            elif ltp["sell"] - l_price >= self.config["takeProfit1"] and l_units == self.config["qty"]:
+                log.info("%s: Closing LONG position 1st half for take profit." % self.instrument)
+                self.clean(side='long', ratio=0.5)
+                self.b_stop_loss = 0
+                return
+            elif ltp["sell"] - l_price >= self.config["takeProfit2"]:
+                log.info("%s: Closing LONG position 2nd half for take profit." % self.instrument)
+                self.clean(side='long')
+                return
+
+        if s_units > 0 and ltp is not None:
+            if _df["close"] - s_price >= self.s_stop_loss:
+                log.info("%s: Closing SHORT position for stop loss." % self.instrument)
+                self.clean(side='short')
+                return
+            elif self.s_start != _df["datetime"] and _df["buy_signal"] == True:
+                log.info("%s: Closing SHORT position on long signal." % self.instrument)
+                self.clean(side='short')
+                return
+            elif s_price - ltp["buy"] >= self.config["takeProfit1"] and s_units == self.config["qty"]:
+                log.info("%s: Closing SHORT position 1st half for take profit." % self.instrument)
+                self.clean(side='short', ratio=0.5)
+                self.s_stop_loss = 0
+                return
+            elif s_price - ltp["buy"] >= self.config["takeProfit2"]:
+                log.info("%s: Closing SHORT position 2nd half for take profit." % self.instrument)
+                self.clean(side='short')
+                return
+
+
+class FxEURJPY:
+    def __init__(self, instrument, config):
+        self.instrument = instrument
+        self.config = config
+        self.df = None
+        self.max_df_rows = 1000
+        self.signal_df = None
+        self.b_stop_loss = config["stopLoss"]
+        self.s_stop_loss = config["stopLoss"]
+        self.open_candle = False
+
+    # EUR_JPY
+    def clean(self, side=None, ratio=1.0):
+        # Close positions
+        close_positions(self.instrument, side=side, ratio=ratio)
+        # Clear first order reference
+        if side in ('long', None):
+            self.b_stop_loss = self.config["stopLoss"]
+        if side in ('short', None):
+            self.s_stop_loss = self.config["stopLoss"]
+
+    # EUR_JPY
+    def update_candles(self):
+        granularity = self.config["granularity"]
+        self.open_candle = False
+        if self.df is None:
+            _to = "{}Z".format(datetime.utcnow().isoformat())
+            data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
+            self.df = pd.DataFrame(data)
+            self.df["datetime"] = pd.to_datetime(self.df["datetime"])
+        else:
+            last_time = self.df.iloc[-1]["datetime"]
+            diff = datetime.now(timezone.utc) - last_time.to_pydatetime()
+            if diff.total_seconds() < 60 * 60:
+                return
+            _from = last_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            data = candle_client.fetch_ohlc(self.instrument, granularity, t_from=_from, includeFirst=False)
+            if len(data) > 0:
+                _df = pd.DataFrame(data)
+                _df["datetime"] = pd.to_datetime(_df["datetime"])
+                self.df = pd.concat([self.df, _df], ignore_index=True)
+                self.df = self.df.tail(self.max_df_rows)
+                self.df.reset_index(drop=True, inplace=True)
+                self.open_candle = True
+
+        candle_client.macd(self.df, a=10, b=20, c=50)
+        candle_client.moving_average(self.df, 20)
+        candle_client.moving_average(self.df, 50)
+
+        # Drop the first 50 rows as the average is not accurate
+        _df = pd.DataFrame(self.df.iloc[50:])
+        _df["buy_signal"] = (_df["close_20_sma"].shift() > _df["close_50_sma"].shift()) & (
+                _df["macdh"].shift() <= 0) & (_df["macdh"] > 0) & (
+                                    _df["datetime"].dt.hour >= 7) & (_df["datetime"].dt.hour <= 24)
+        _df["sell_signal"] = (_df["close_20_sma"].shift() < _df["close_50_sma"].shift()) & (
+                _df["macdh"].shift() >= 0) & (_df["macdh"] < 0) & (
+                                     _df["datetime"].dt.hour >= 7) & (_df["datetime"].dt.hour <= 24)
+
+        self.signal_df = _df
+
+    # EUR_JPY
+    def run(self, o_pos, ltp):
+        l_price = None
+        s_price = None
+        l_units = 0
+        s_units = 0
+        if len(o_pos) > 0:
+            l_units = abs(int(o_pos["long"]["units"]))
+            s_units = abs(int(o_pos["short"]["units"]))
+            if l_units != 0:
+                l_price = float(o_pos['long']['averagePrice'])
+            if s_units != 0:
+                s_price = float(o_pos['short']['averagePrice'])
+
+        _df = self.signal_df.iloc[-1]
+        if l_units == 0 or s_units == 0:
+            if l_units == 0 and _df["buy_signal"] is True:
+                log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
+                market_order(self.instrument, self.config['qty'])
+                self.b_stop_loss = self.config["stopLoss"]
+            if s_units == 0 and _df["sell_signal"] is True:
+                log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
+                market_order(self.instrument, self.config['qty'] * -1)
+                self.s_stop_loss = self.config["stopLoss"]
+            return
+
+        if l_units > 0 and ltp is not None:
+            if l_price - ltp["sell"] >= self.b_stop_loss:
                 log.info("%s: Closing LONG position for stop loss." % self.instrument)
                 self.clean(side='long')
                 return
@@ -539,13 +661,18 @@ class FxAUDUSD:
                 log.info("%s: Closing LONG position on short signal." % self.instrument)
                 self.clean(side='long')
                 return
-            elif ltp["sell"] - l_price >= self.config["takeProfit"]:
-                log.info("%s: Closing LONG position for take profit." % self.instrument)
+            elif ltp["sell"] - l_price >= self.config["takeProfit1"] and l_units == self.config["qty"]:
+                log.info("%s: Closing LONG position 1st half for take profit." % self.instrument)
+                self.clean(side='long', ratio=0.5)
+                self.b_stop_loss = 0
+                return
+            elif ltp["sell"] - l_price >= self.config["takeProfit2"]:
+                log.info("%s: Closing LONG position 2nd half for take profit." % self.instrument)
                 self.clean(side='long')
                 return
 
         if s_units > 0 and ltp is not None:
-            if _df["close"] - s_price >= self.config["stopLoss"]:
+            if ltp["buy"] - s_price >= self.s_stop_loss:
                 log.info("%s: Closing SHORT position for stop loss." % self.instrument)
                 self.clean(side='short')
                 return
@@ -553,8 +680,136 @@ class FxAUDUSD:
                 log.info("%s: Closing SHORT position on long signal." % self.instrument)
                 self.clean(side='short')
                 return
-            elif s_price - ltp["buy"] >= self.config["takeProfit"]:
-                log.info("%s: Closing SHORT position for take profit." % self.instrument)
+            elif s_price - ltp["buy"] >= self.config["takeProfit1"] and s_units == self.config["qty"]:
+                log.info("%s: Closing SHORT position 1st half for take profit." % self.instrument)
+                self.clean(side='short', ratio=0.5)
+                self.s_stop_loss = 0
+                return
+            elif s_price - ltp["buy"] >= self.config["takeProfit2"]:
+                log.info("%s: Closing SHORT position 2nd half for take profit." % self.instrument)
+                self.clean(side='short')
+                return
+
+
+class FxUSDJPY:
+    def __init__(self, instrument, config):
+        self.instrument = instrument
+        self.config = config
+        self.df = None
+        self.max_df_rows = 1000
+        self.signal_df = None
+        self.b_stop_loss = config["stopLoss"]
+        self.s_stop_loss = config["stopLoss"]
+        self.open_candle = False
+
+    # USD_JPY
+    def clean(self, side=None, ratio=1.0):
+        # Close positions
+        close_positions(self.instrument, side=side, ratio=ratio)
+        # Clear first order reference
+        if side in ('long', None):
+            self.b_stop_loss = self.config["stopLoss"]
+        if side in ('short', None):
+            self.s_stop_loss = self.config["stopLoss"]
+
+    # USD_JPY
+    def update_candles(self):
+        granularity = self.config["granularity"]
+        self.open_candle = False
+        if self.df is None:
+            _to = "{}Z".format(datetime.utcnow().isoformat())
+            data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
+            self.df = pd.DataFrame(data)
+            self.df["datetime"] = pd.to_datetime(self.df["datetime"])
+        else:
+            last_time = self.df.iloc[-1]["datetime"]
+            diff = datetime.now(timezone.utc) - last_time.to_pydatetime()
+            if diff.total_seconds() < 60 * 60:
+                return
+            _from = last_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            data = candle_client.fetch_ohlc(self.instrument, granularity, t_from=_from, includeFirst=False)
+            if len(data) > 0:
+                _df = pd.DataFrame(data)
+                _df["datetime"] = pd.to_datetime(_df["datetime"])
+                self.df = pd.concat([self.df, _df], ignore_index=True)
+                self.df = self.df.tail(self.max_df_rows)
+                self.df.reset_index(drop=True, inplace=True)
+                self.open_candle = True
+
+        candle_client.macd(self.df, a=10, b=20, c=50)
+        candle_client.moving_average(self.df, 20)
+        candle_client.moving_average(self.df, 50)
+
+        # Drop the first 50 rows as the average is not accurate
+        _df = pd.DataFrame(self.df.iloc[50:])
+        _df["buy_signal"] = (_df["close_20_sma"].shift() > _df["close_50_sma"].shift()) & (
+                                _df["macdh"].shift() <= 0) & (_df["macdh"] >= 0.0001)
+        _df["sell_signal"] = (_df["close_20_sma"].shift() < _df["close_50_sma"].shift()) & (
+                                _df["macdh"].shift() >= 0) & (_df["macdh"] <= -0.0001)
+
+        self.signal_df = _df
+
+    # USD_JPY
+    def run(self, o_pos, ltp):
+        l_price = None
+        s_price = None
+        l_units = 0
+        s_units = 0
+        if len(o_pos) > 0:
+            l_units = abs(int(o_pos["long"]["units"]))
+            s_units = abs(int(o_pos["short"]["units"]))
+            if l_units != 0:
+                l_price = float(o_pos['long']['averagePrice'])
+            if s_units != 0:
+                s_price = float(o_pos['short']['averagePrice'])
+
+        _df = self.signal_df.iloc[-1]
+        if l_units == 0 or s_units == 0:
+            if l_units == 0 and _df["buy_signal"] is True:
+                log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
+                market_order(self.instrument, self.config['qty'])
+                self.b_stop_loss = self.config["stopLoss"]
+            if s_units == 0 and _df["sell_signal"] is True:
+                log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
+                market_order(self.instrument, self.config['qty'] * -1)
+                self.s_stop_loss = self.config["stopLoss"]
+            return
+
+        if l_units > 0 and ltp is not None:
+            if l_price - ltp["sell"] >= self.b_stop_loss:
+                log.info("%s: Closing LONG position for stop loss." % self.instrument)
+                self.clean(side='long')
+                return
+            elif _df["sell_signal"] == True:
+                log.info("%s: Closing LONG position on short signal." % self.instrument)
+                self.clean(side='long')
+                return
+            elif ltp["sell"] - l_price >= self.config["takeProfit1"] and l_units == self.config["qty"]:
+                log.info("%s: Closing LONG position 1st half for take profit." % self.instrument)
+                self.clean(side='long', ratio=0.5)
+                self.b_stop_loss = 0
+                return
+            elif ltp["sell"] - l_price >= self.config["takeProfit2"]:
+                log.info("%s: Closing LONG position 2nd half for take profit." % self.instrument)
+                self.clean(side='long')
+                return
+
+        if s_units > 0 and ltp is not None:
+            if ltp["buy"] - s_price >= self.s_stop_loss:
+                log.info("%s: Closing SHORT position for stop loss." % self.instrument)
+                self.clean(side='short')
+                return
+            elif _df["buy_signal"] == True:
+                log.info("%s: Closing SHORT position on long signal." % self.instrument)
+                self.clean(side='short')
+                return
+            elif s_price - ltp["buy"] >= self.config["takeProfit1"] and s_units == self.config["qty"]:
+                log.info("%s: Closing SHORT position 1st half for take profit." % self.instrument)
+                self.clean(side='short', ratio=0.5)
+                self.s_stop_loss = 0
+                return
+            elif s_price - ltp["buy"] >= self.config["takeProfit2"]:
+                log.info("%s: Closing SHORT position 2nd half for take profit." % self.instrument)
                 self.clean(side='short')
                 return
 
@@ -598,13 +853,11 @@ class Practice:
             self.s_sl_price = None
 
     def update_trend(self):
-        new_candle = False
         granularity = self.config["granularity"]
         if self.df is None:
             _to = "{}Z".format(datetime.utcnow().isoformat())
             data = candle_client.fetch_ohlc(self.instrument, granularity, t_to=_to, count=self.max_df_rows)
             self.df = pd.DataFrame(data)
-            new_candle = True
         else:
             last_time = self.df.iloc[-1]["datetime"]
             data = candle_client.fetch_ohlc(self.instrument, granularity, t_from=last_time, includeFirst=False)
@@ -613,10 +866,6 @@ class Practice:
                 self.df = pd.concat([self.df, _df], ignore_index=True)
                 self.df = self.df.tail(self.max_df_rows)
                 self.df.reset_index(drop=True, inplace=True)
-                new_candle = True
-
-        if new_candle is False:
-            return
 
         candle_client.moving_average(self.df, 9)
         candle_client.moving_average(self.df, 20)
@@ -747,12 +996,16 @@ for _symbol, _config in params["symbols"].items():
     log.info("Clearing existing positions for %s" % _symbol)
     clear_symbol(_symbol)
     _s = None
-    if _symbol == "GBP_USD":
-        _s = FxGBPUSD(_symbol, _config)
-    elif _symbol == "EUR_USD":
+    # if _symbol == "GBP_USD":
+    #     _s = FxGBPUSD(_symbol, _config)
+    if _symbol == "EUR_USD":
         _s = FxEURUSD(_symbol, _config)
     elif _symbol == "AUD_USD":
         _s = FxAUDUSD(_symbol, _config)
+    elif _symbol == "EUR_JPY":
+        _s = FxEURJPY(_symbol, _config)
+    elif _symbol == "USD_JPY":
+        _s = FxUSDJPY(_symbol, _config)
 
     if _s is not None:
         symbol_list.append(_symbol)
