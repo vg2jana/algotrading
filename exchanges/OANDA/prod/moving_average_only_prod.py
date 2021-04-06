@@ -1014,6 +1014,7 @@ for _symbol, _config in params["symbols"].items():
 time.sleep(2)
 stop_signal = False
 nav = None
+reconnect = False
 
 while True:
 
@@ -1045,14 +1046,22 @@ while True:
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
+        if "Insufficient authorization to perform request" in e.msg:
+            reconnect = True
+        else:
+            time.sleep(5)
 
     except requests.exceptions.ConnectionError as e:
         log.warning(e)
+        reconnect = True
+
+    if reconnect is True:
         while True:
             log.info("Retrying...")
             try:
                 client = oandapyV20.API(access_token=token, environment="live")
                 candle_client = Candles(client)
+                reconnect = False
             except Exception as e:
                 log.warning(e)
                 time.sleep(60)

@@ -107,6 +107,20 @@ def macd(dataframe, a=9, b=12, c=26, source="close", slope=False):
         dataframe["macd_sig_slope"] = calculate_slope(dataframe["macd_sig"], 5)
 
 
+def atr(DF, n):
+    "function to calculate True Range and Average True Range"
+    df = DF.copy()
+    df['H-L'] = abs(df['high'] - df['low'])
+    df['H-PC'] = abs(df['high'] - df['close'].shift(1))
+    df['L-PC'] = abs(df['low'] - df['close'].shift(1))
+    df['TR'] = df[['H-L', 'H-PC', 'L-PC']].max(axis=1, skipna=False)
+    df['ATR'] = df['TR'].rolling(n).mean()
+    # df['ATR'] = (df['ATR'].shift(1) * 13 + df['TR']) / 14
+    # df['ATR'] = df['TR'].ewm(span=n,adjust=False,min_periods=n).mean()
+    df2 = df.drop(['H-L', 'H-PC', 'L-PC'], axis=1)
+    return df2['ATR']
+
+
 # ----- Fixed -----
 def backtest_eur_jpy_H1():
     df = pd.read_json("data/eur_jpy_2year_H1")
@@ -441,30 +455,20 @@ def backtest_aud_usd_H1():
 
 
 def backtest_gbp_usd_H1():
-    df = pd.read_json("data/gbp_usd_2year_H1")
-    df["day"] = (df["datetime"].dt.day_name())
-    macd(df, a=9, b=12, c=26)
-    df.dropna(inplace=True)
-    point = "close"
-    m = [20, 50]
+    df = pd.read_json("data/gbp_usd_1year_M15")
+    df["atr"] = atr(df, 14)
+    m = [50, 200]
     for _t in m:
-        moving_average(df, _t, source=point)
-    ma = ["%s_%s_sma" % (point, _m) for _m in m]
+        moving_average(df, _t)
+    ma = ["close_%s_sma" % _m for _m in m]
 
     _df = pd.DataFrame(df.iloc[m[-1]:])
-    start_hour = 0
-    end_hour = 24
-    _df["buy"] = (_df[ma[0]].shift() > _df[ma[1]].shift()) & (_df["macdh"].shift() <= 0) & (_df["macdh"] > 0) & (
-            (_df["datetime"].dt.hour >= start_hour) | (_df["datetime"].dt.hour <= end_hour))
-    _df["sell"] = (_df[ma[0]].shift() < _df[ma[1]].shift()) & (_df["macdh"].shift() >= 0) & (_df["macdh"] < 0) & (
-            (_df["datetime"].dt.hour >= start_hour) | (_df["datetime"].dt.hour <= end_hour))
-
-    _df["trend_high"] = (_df["macdh"] > 0) & (_df["macdh"].shift() <= 0) & (
-            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
-    _df["trend_low"] = (_df["macdh"] < 0) & (_df["macdh"].shift() >= 0) & (
-            _df["datetime"].dt.hour >= start_hour) & (_df["datetime"].dt.hour <= end_hour)
-
-    _df["mm"] = _df["macdh"] > 0
+    _df["buy"] = (_df[ma[0]] > _df[ma[1]]) & (_df["open"].shift() > _df[ma[0]].shift()) & (
+            _df["close"].shift() < _df[ma[0]].shift()) & (
+                         _df["open"] < _df[ma[0]]) & (_df["close"] > _df[ma[0]])
+    _df["sell"] = (_df[ma[0]] < _df[ma[1]]) & (_df["open"].shift() < _df[ma[0]].shift()) & (
+            _df["close"].shift() > _df[ma[0]].shift()) & (
+                          _df["open"] > _df[ma[0]]) & (_df["close"] < _df[ma[0]])
 
     df = _df
     df.reset_index(drop=True, inplace=True)
@@ -482,28 +486,18 @@ def backtest_gbp_usd_H1():
             buy["entry_price"] = df["open"][i]
             buy["entry_row"] = i
             buy["open_time"] = df["datetime"][i]
-            b_sl = sl
+            b_sl = df["atr"][i]
         if len(sell) == 0 and df["sell"][i - 1] == True:
             sell["entry_price"] = df["open"][i]
             sell["entry_row"] = i
             sell["open_time"] = df["datetime"][i]
-            s_sl = sl
+            s_sl = df["atr"][i]
 
         if len(buy) != 0:
-            if i != buy["entry_row"] and df["sell"][i - 1] == True:
-                buy["exit_price"] = df["open"][i]
-            elif (df[buy["entry_row"]:i]["mm"].values.sum() < (~df[buy["entry_row"]:i]["mm"]).values.sum()) or (
-                    df["trend_low"][i - 1] == True and i - buy["entry_row"] <= 5):
-                buy["exit_price"] = df["open"][i]
-            elif df["low"][i] - buy["entry_price"] <= b_sl:
-                if b_sl != sl:
-                    buy["exit_price"] = (buy["entry_price"] + tp1 + buy["entry_price"]) / 2
-                else:
-                    buy["exit_price"] = buy["entry_price"] + b_sl
-            elif df["high"][i] - buy["entry_price"] >= tp2:
-                buy["exit_price"] = (buy["entry_price"] + tp1 + buy["entry_price"] + tp2) / 2
-            elif df["high"][i] - buy["entry_price"] >= tp1:
-                b_sl = 0
+            if df["low"][i] <= buy["entry_price"] - b_sl:
+                buy["exit_price"] = buy["entry_price"] - b_sl
+            elif df["high"][i] - buy["entry_price"] >= b_sl * 3:
+                buy["exit_price"] = buy["entry_price"] + (b_sl * 3)
 
             if "exit_price" in buy:
                 buy["exit_row"] = i
@@ -511,25 +505,14 @@ def backtest_gbp_usd_H1():
                 buy["period"] = buy["exit_row"] - buy["entry_row"]
                 buy["side"] = "buy"
                 buy["close_time"] = df["datetime"][i]
-                buy["day"] = df["day"][buy["entry_row"]]
                 trades.append(buy)
                 buy = {}
 
         if len(sell) != 0:
-            if i != sell["entry_row"] and df["buy"][i - 1] == True:
-                sell["exit_price"] = df["open"][i]
-            elif (df[sell["entry_row"]:i]["mm"].values.sum() > (~df[sell["entry_row"]:i]["mm"]).values.sum()) or (
-                    df["trend_high"][i - 1] == True and i - sell["entry_row"] <= 5):
-                sell["exit_price"] = df["open"][i]
-            elif sell["entry_price"] - df["high"][i] <= s_sl:
-                if s_sl != sl:
-                    sell["exit_price"] = (sell["entry_price"] - tp1 + sell["entry_price"]) / 2
-                else:
-                    sell["exit_price"] = sell["entry_price"] - s_sl
-            elif sell["entry_price"] - df["low"][i] >= tp2:
-                sell["exit_price"] = (sell["entry_price"] - tp1 + sell["entry_price"] - tp2) / 2
-            elif sell["entry_price"] - df["low"][i] >= tp1:
-                s_sl = 0
+            if df["high"][i] >= sell["entry_price"] + s_sl:
+                sell["exit_price"] = sell["entry_price"] + s_sl
+            elif sell["entry_price"] - df["low"][i] >= s_sl * 3:
+                sell["exit_price"] = sell["entry_price"] - (s_sl * 3)
 
             if "exit_price" in sell:
                 sell["exit_row"] = i
@@ -537,7 +520,6 @@ def backtest_gbp_usd_H1():
                 sell["period"] = sell["exit_row"] - sell["entry_row"]
                 sell["side"] = "sell"
                 sell["close_time"] = df["datetime"][i]
-                sell["day"] = df["day"][sell["entry_row"]]
                 trades.append(sell)
                 sell = {}
 
@@ -746,8 +728,10 @@ if __name__ == "__main__":
     # client = oandapyV20.API(access_token=token, environment="live")
     # dump_to_json_file()
 
+    # -- Fixed --
     # backtest_eur_jpy_H1()
     # backtest_usd_jpy_H1()
-    backtest_aud_usd_H1()
-    # test()
+    # backtest_aud_usd_H1()
     # backtest_eur_usd_M15()
+
+    backtest_gbp_usd_H1()
