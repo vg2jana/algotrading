@@ -1019,6 +1019,10 @@ reconnect = False
 while True:
 
     try:
+        utc_now = datetime.utcnow()
+        if utc_now.weekday() == 4 and utc_now.hour >= 22:
+            time.sleep(48 * 60 * 60)
+        
         if os.path.exists('STOP'):
             stop_signal = True
 
