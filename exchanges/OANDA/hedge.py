@@ -237,8 +237,6 @@ symbols = []
 symbol_list = []
 
 for s, c in params["symbols"].items():
-    if s != "USD_JPY":
-        continue
     symbol = Symbol(s, c)
     symbol.clean()
     symbols.append(symbol)
