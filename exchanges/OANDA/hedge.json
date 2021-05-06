@@ -1,0 +1,44 @@
+{
+    "symbols": {
+
+        "EUR_USD": {
+            "qty": 1000,
+            "takeProfit": 5,
+            "stopLoss": 25,
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "AUD_USD": {
+            "qty": 1000,
+            "takeProfit": 5,
+            "stopLoss": 25,
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "GBP_USD": {
+            "qty": 1000,
+            "takeProfit": 5,
+            "stopLoss": 25,
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "USD_JPY": {
+            "qty": 1000,
+            "takeProfit": 5,
+            "stopLoss": 25,
+            "pips": 0.01,
+            "precision": 3
+        },
+
+        "EUR_JPY": {
+            "qty": 1000,
+            "takeProfit": 5,
+            "stopLoss": 25,
+            "pips": 0.01,
+            "precision": 3
+        }
+    }
+}
