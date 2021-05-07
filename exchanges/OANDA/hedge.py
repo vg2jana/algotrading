@@ -275,10 +275,7 @@ while True:
             nav = account_info['NAV']
             inLoop = False
 
-            if net < 0:
-                log.info("Stopping on hitting a loss.")
-                break
-            elif stop_signal is True:
+            if stop_signal is True:
                 log.info("Stopping on signal.")
                 break
 
@@ -314,4 +311,4 @@ while True:
                 time.sleep(60)
             else:
                 break
-    time.sleep(5)
+    time.sleep(2)
