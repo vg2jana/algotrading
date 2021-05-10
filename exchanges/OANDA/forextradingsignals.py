@@ -82,8 +82,10 @@ def open_positions():
 
 
 def close_positions(instrument, side=None, ratio=1.0):
+    logging.info(f"Received request to close position for {instrument}")
     temp = o_positions.get(instrument, {})
     if len(temp) == 0:
+        logging.warning(f"Symbol {instrument} not in open positions list:\n{o_positions}")
         return
     l_units = abs(int(temp["long"]["units"]) * ratio)
     s_units = abs(int(temp["short"]["units"]) * ratio)
@@ -96,12 +98,15 @@ def close_positions(instrument, side=None, ratio=1.0):
         "longUnits": str(l_units) if l_units > 0 else "NONE",
         "shortUnits": str(s_units) if s_units > 0 else "NONE"
     }
+    logging.info(f"Closing position for symbol {instrument} with payload:\n{data}")
     r = positions.PositionClose(account_id, instrument, data)
     try:
         client.request(r)
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
     else:
+        time.sleep(1)
+        logging.info(f"Position closed for symbol {instrument}, response:\n{r.response}")
         return r.response
 
 
@@ -205,7 +210,9 @@ while True:
         signalList = readSignal()
         for line in signalList:
             signal = parseSignal(line)
+            logging.info("Parsed signal: %s" % signal)
             if signal.get("symbol", None) is None:
+                logging.warning("No symbol in parsed signal, ignoring signal.")
                 continue
 
             symbol = signal["symbol"]
@@ -222,6 +229,7 @@ while True:
                     qty *= -1
                 log.info("%s: Market order, Units: %s" % (symbol, qty))
                 market_order(symbol, qty)
+                time.sleep(1)
                 continue
 
         for symbol in o_trades.keys():
@@ -232,6 +240,7 @@ while True:
             o_trd = o_trades[symbol]
             if o_trd.get("takeProfitOrder", None) is None:
                 amend_trade(o_trd["id"], tp_price=ledger[symbol]["tp"], sl_price=ledger[symbol]["sl"])
+                time.sleep(1)
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
@@ -256,4 +265,4 @@ while True:
             else:
                 break
 
-    time.sleep(0.1)
+    time.sleep(1)
