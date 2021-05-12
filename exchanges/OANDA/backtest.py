@@ -52,11 +52,11 @@ def fetch_ohlc(symbol, granularity, count=500, t_from=None, t_to=None, align_tz=
 
 def dump_to_json_file():
     data = []
-    symbol = "EUR_CAD"
-    granularity = "D"
+    symbol = "EUR_JPY"
+    granularity = "H1"
     while True:
         if len(data) == 0:
-            t_from = "2017-03-01T00:00:00.00Z"
+            t_from = "2019-05-01T00:00:00.00Z"
             d = fetch_ohlc(symbol, granularity, t_from=t_from, count=1000)
         else:
             t_from = data[-1]["datetime"]
@@ -65,7 +65,7 @@ def dump_to_json_file():
             break
         data.extend(d)
 
-    with open("data/{}_4year_{}".format(symbol.lower(), granularity), "w") as f:
+    with open("data/{}_2year_{}".format(symbol.lower(), granularity), "w") as f:
         json.dump(data, f, indent=4)
 
 
@@ -729,9 +729,10 @@ if __name__ == "__main__":
     # dump_to_json_file()
 
     # -- Fixed --
-    # backtest_eur_jpy_H1()
+    backtest_eur_jpy_H1()
     # backtest_usd_jpy_H1()
     # backtest_aud_usd_H1()
     # backtest_eur_usd_M15()
 
-    backtest_gbp_usd_H1()
+    # -- Under test --
+    # backtest_gbp_usd_H1()

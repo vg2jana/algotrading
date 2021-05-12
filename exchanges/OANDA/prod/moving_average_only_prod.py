@@ -401,10 +401,10 @@ class FxEURUSD:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] is True:
+            if l_units == 0 and _df["buy_signal"] == True:
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
-            if s_units == 0 and _df["sell_signal"] is True:
+            if s_units == 0 and _df["sell_signal"] == True:
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
             return
@@ -515,12 +515,12 @@ class FxAUDUSD:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] is True:
+            if l_units == 0 and _df["buy_signal"] == True:
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.b_stop_loss = self.config["stopLoss"]
                 self.b_start = _df["datetime"]
-            if s_units == 0 and _df["sell_signal"] is True:
+            if s_units == 0 and _df["sell_signal"] == True:
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_stop_loss = self.config["stopLoss"]
@@ -642,11 +642,11 @@ class FxEURJPY:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] is True:
+            if l_units == 0 and _df["buy_signal"] == True:
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.b_stop_loss = self.config["stopLoss"]
-            if s_units == 0 and _df["sell_signal"] is True:
+            if s_units == 0 and _df["sell_signal"] == True:
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_stop_loss = self.config["stopLoss"]
@@ -765,11 +765,11 @@ class FxUSDJPY:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] is True:
+            if l_units == 0 and _df["buy_signal"] == True:
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.b_stop_loss = self.config["stopLoss"]
-            if s_units == 0 and _df["sell_signal"] is True:
+            if s_units == 0 and _df["sell_signal"] == True:
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_stop_loss = self.config["stopLoss"]

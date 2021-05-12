@@ -208,6 +208,7 @@ while True:
         o_trades = open_trades()
 
         signalList = readSignal()
+        updated = False
         for line in signalList:
             signal = parseSignal(line)
             logging.info("Parsed signal: %s" % signal)
@@ -221,6 +222,7 @@ while True:
             if signal.get("close", False) is True:
                 close_positions(symbol)
                 ledger[symbol] = None
+                updated = True
                 continue
 
             if signal.get("side", None) is not None:
@@ -230,7 +232,13 @@ while True:
                 log.info("%s: Market order, Units: %s" % (symbol, qty))
                 market_order(symbol, qty)
                 time.sleep(1)
+                updated = True
                 continue
+
+        if updated is True:
+            time.sleep(1)
+            o_positions = open_positions()
+            o_trades = open_trades()
 
         for symbol in o_trades.keys():
             if ledger.get(symbol, None) is None:
