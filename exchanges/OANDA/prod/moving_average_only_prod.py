@@ -11,6 +11,7 @@ import logging
 import os
 import requests
 import sys
+import numpy as np
 from datetime import datetime, timezone
 
 sys.path.append("../../../exchanges")
@@ -309,13 +310,13 @@ def clear_symbol(instrument):
 #             return
 #
 #         if l_units > 0:
-#             if _df["exit_buy"] == True or _df["sell"] == True or l_price - self.config["stopLoss"] < _df["close"]:
+#             if _df["exit_buy"] is np.bool_(True) or _df["sell"] is np.bool_(True) or l_price - self.config["stopLoss"] < _df["close"]:
 #                 log.info("%s: Closing LONG position" % self.instrument)
 #                 self.clean(side='long')
 #                 return
 #
 #         if s_units > 0:
-#             if _df["exit_sell"] == True or _df["buy"] == True or s_price + self.config["stopLoss"] > _df["close"]:
+#             if _df["exit_sell"] is np.bool_(True) or _df["buy"] is np.bool_(True) or s_price + self.config["stopLoss"] > _df["close"]:
 #                 log.info("%s: Closing SHORT position" % self.instrument)
 #                 self.clean(side='short')
 #                 return
@@ -401,20 +402,20 @@ class FxEURUSD:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] == True:
+            if l_units == 0 and _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
-            if s_units == 0 and _df["sell_signal"] == True:
+            if s_units == 0 and _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
             return
 
         if l_units > 0 and ltp is not None:
-            if _df["trend_high"] == True and ltp["sell"] - l_price >= 2 * self.config["takeProfit"]:
+            if _df["trend_high"] is np.bool_(True) and ltp["sell"] - l_price >= 2 * self.config["takeProfit"]:
                 log.info("%s: Closing LONG position for double take profit." % self.instrument)
                 self.clean(side='long')
                 return
-            elif _df["trend_high"] == False:
+            elif _df["trend_high"] is np.bool_(False):
                 if l_price - ltp["sell"] >= self.config["stopLoss"]:
                     log.info("%s: Closing LONG position for stop loss." % self.instrument)
                     self.clean(side='long')
@@ -425,11 +426,11 @@ class FxEURUSD:
                     return
 
         if s_units > 0 and ltp is not None:
-            if _df["trend_low"] == True and s_price - ltp["buy"] >= 2 * self.config["takeProfit"]:
+            if _df["trend_low"] is np.bool_(True) and s_price - ltp["buy"] >= 2 * self.config["takeProfit"]:
                 log.info("%s: Closing SHORT position for double take profit." % self.instrument)
                 self.clean(side='short')
                 return
-            elif _df["trend_low"] == False:
+            elif _df["trend_low"] is np.bool_(False):
                 if ltp["buy"] - s_price >= self.config["stopLoss"]:
                     log.info("%s: Closing SHORT position for stop loss." % self.instrument)
                     self.clean(side='short')
@@ -515,12 +516,12 @@ class FxAUDUSD:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] == True:
+            if l_units == 0 and _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.b_stop_loss = self.config["stopLoss"]
                 self.b_start = _df["datetime"]
-            if s_units == 0 and _df["sell_signal"] == True:
+            if s_units == 0 and _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_stop_loss = self.config["stopLoss"]
@@ -532,7 +533,7 @@ class FxAUDUSD:
                 log.info("%s: Closing LONG position for stop loss." % self.instrument)
                 self.clean(side='long')
                 return
-            elif self.b_start != _df["datetime"] and _df["sell_signal"] == True:
+            elif self.b_start != _df["datetime"] and _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Closing LONG position on short signal." % self.instrument)
                 self.clean(side='long')
                 return
@@ -551,7 +552,7 @@ class FxAUDUSD:
                 log.info("%s: Closing SHORT position for stop loss." % self.instrument)
                 self.clean(side='short')
                 return
-            elif self.s_start != _df["datetime"] and _df["buy_signal"] == True:
+            elif self.s_start != _df["datetime"] and _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Closing SHORT position on long signal." % self.instrument)
                 self.clean(side='short')
                 return
@@ -642,11 +643,11 @@ class FxEURJPY:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] == True:
+            if l_units == 0 and _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.b_stop_loss = self.config["stopLoss"]
-            if s_units == 0 and _df["sell_signal"] == True:
+            if s_units == 0 and _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_stop_loss = self.config["stopLoss"]
@@ -657,7 +658,7 @@ class FxEURJPY:
                 log.info("%s: Closing LONG position for stop loss." % self.instrument)
                 self.clean(side='long')
                 return
-            elif _df["sell_signal"] == True:
+            elif _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Closing LONG position on short signal." % self.instrument)
                 self.clean(side='long')
                 return
@@ -676,7 +677,7 @@ class FxEURJPY:
                 log.info("%s: Closing SHORT position for stop loss." % self.instrument)
                 self.clean(side='short')
                 return
-            elif _df["buy_signal"] == True:
+            elif _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Closing SHORT position on long signal." % self.instrument)
                 self.clean(side='short')
                 return
@@ -765,11 +766,11 @@ class FxUSDJPY:
 
         _df = self.signal_df.iloc[-1]
         if l_units == 0 or s_units == 0:
-            if l_units == 0 and _df["buy_signal"] == True:
+            if l_units == 0 and _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Market order LONG, Units: %s" % (self.instrument, self.config['qty']))
                 market_order(self.instrument, self.config['qty'])
                 self.b_stop_loss = self.config["stopLoss"]
-            if s_units == 0 and _df["sell_signal"] == True:
+            if s_units == 0 and _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Market order SHORT, Units: %s" % (self.instrument, self.config['qty'] * -1))
                 market_order(self.instrument, self.config['qty'] * -1)
                 self.s_stop_loss = self.config["stopLoss"]
@@ -780,7 +781,7 @@ class FxUSDJPY:
                 log.info("%s: Closing LONG position for stop loss." % self.instrument)
                 self.clean(side='long')
                 return
-            elif _df["sell_signal"] == True:
+            elif _df["sell_signal"] is np.bool_(True):
                 log.info("%s: Closing LONG position on short signal." % self.instrument)
                 self.clean(side='long')
                 return
@@ -799,7 +800,7 @@ class FxUSDJPY:
                 log.info("%s: Closing SHORT position for stop loss." % self.instrument)
                 self.clean(side='short')
                 return
-            elif _df["buy_signal"] == True:
+            elif _df["buy_signal"] is np.bool_(True):
                 log.info("%s: Closing SHORT position on long signal." % self.instrument)
                 self.clean(side='short')
                 return
