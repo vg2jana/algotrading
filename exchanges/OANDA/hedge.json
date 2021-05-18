@@ -1,0 +1,53 @@
+{
+    "symbols": {
+
+        "GBP_JPY": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.01,
+            "precision": 3
+        },
+
+        "EUR_JPY": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.01,
+            "precision": 3
+        },
+
+        "AUD_JPY": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.01,
+            "precision": 3
+        },
+
+        "GBP_CHF": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "EUR_CHF": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "GBP_USD": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "NZD_USD": {
+            "qty": 100,
+            "distance": 30,
+            "pips": 0.0001,
+            "precision": 5
+        }
+    }
+}

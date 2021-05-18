@@ -387,7 +387,7 @@ def backtest_aud_usd_H1():
     trades = []
     df.reset_index(drop=True, inplace=True)
     # TODO: TP1 at 0.075 and TP2 at 0.015
-    tp1 = 0.0075
+    tp1 = 0.075
     tp2 = 0.01  # or 0.01
     sl = -0.01
     for i in range(1, len(df)):
@@ -730,9 +730,9 @@ if __name__ == "__main__":
 
     # -- Fixed --
     # backtest_eur_jpy_H1()
-    # backtest_usd_jpy_H1()
+    backtest_usd_jpy_H1()
     # backtest_aud_usd_H1()
-    backtest_eur_usd_M15()
+    # backtest_eur_usd_M15()
 
     # -- Under test --
     # backtest_gbp_usd_H1()
