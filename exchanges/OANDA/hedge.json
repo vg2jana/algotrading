@@ -22,18 +22,11 @@
             "precision": 3
         },
 
-        "GBP_CHF": {
+        "USD_JPY": {
             "qty": 100,
             "distance": 30,
-            "pips": 0.0001,
-            "precision": 5
-        },
-
-        "EUR_CHF": {
-            "qty": 100,
-            "distance": 30,
-            "pips": 0.0001,
-            "precision": 5
+            "pips": 0.01,
+            "precision": 3
         },
 
         "GBP_USD": {

@@ -245,7 +245,7 @@ class Hedge:
             if s_units != 0:
                 s_price = float(o_pos['short']['averagePrice'])
 
-        if self.hedge_index + 1 >= len(hedge_series):
+        if self.hedge_index >= len(hedge_series):
             close = False
             if l_units > s_units:
                 sl_price = l_price - self.config["pips"] * self.config["distance"]
@@ -267,7 +267,7 @@ class Hedge:
             self.last_side = "long"
             return
 
-        if l_units > s_units and self.last_side == "long":
+        if l_units > s_units and self.last_side == "long" and self.hedge_index < len(hedge_series):
             if ltp["sell"] <= l_price - self.config["pips"] * self.config["distance"]:
                 qty = hedge_series[self.hedge_index] * self.config["qty"] * -1
                 log.info("%s: Market order, Units: %s" % (self.instrument, qty))
@@ -276,22 +276,24 @@ class Hedge:
                 self.hedge_index += 1
                 return
 
-        if s_units > l_units and self.last_side == "short":
+        if s_units > l_units and self.last_side == "short" and self.hedge_index < len(hedge_series):
             if ltp["buy"] >= s_price + self.config["pips"] * self.config["distance"]:
                 qty = hedge_series[self.hedge_index] * self.config["qty"]
                 log.info("%s: Market order, Units: %s" % (self.instrument, qty))
                 market_order(self.instrument, qty)
-                self.last_side = "short"
+                self.last_side = "long"
                 self.hedge_index += 1
                 return
 
-        if ltp["sell"] >= l_price + self.config["pips"] * self.config["distance"]:
+        if l_price is not None and ltp["sell"] >= l_price + self.config["pips"] * self.config["distance"]:
             log.info("%s: Long trade take profit reached, closing positions..." % self.instrument)
             self.clean()
+            return
 
-        if ltp["buy"] <= s_price - self.config["pips"] * self.config["distance"]:
+        if s_price is not None and ltp["buy"] <= s_price - self.config["pips"] * self.config["distance"]:
             log.info("%s: Short trade take profit reached, closing positions..." % self.instrument)
             self.clean()
+            return
 
 
 # class Symbol:
@@ -417,7 +419,7 @@ o_positions = open_positions()
 # o_trades = open_trades()
 o_orders = open_orders()
 symbol_list = []
-hedge_series = (3, 8, 21, 55)
+hedge_series = (3, 8, 21, 55, 168)
 
 log.info("Clearing existing positions...")
 for s, c in params["symbols"].items():
