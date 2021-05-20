@@ -419,7 +419,7 @@ o_positions = open_positions()
 # o_trades = open_trades()
 o_orders = open_orders()
 symbol_list = []
-hedge_series = (3, 8, 21, 55, 168)
+hedge_series = (3, 8, 24, 72)
 
 log.info("Clearing existing positions...")
 for s, c in params["symbols"].items():
