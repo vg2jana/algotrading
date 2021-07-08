@@ -1,0 +1,39 @@
+{
+    "symbols": {
+
+        "EUR_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "USD_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+
+        "GBP_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "USD_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "USD_CAD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "AUD_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+
+        "NZD_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        }
+    }
+}
