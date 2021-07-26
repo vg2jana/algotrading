@@ -17,7 +17,7 @@ sys.path.append("../../../exchanges")
 from exchanges.OANDA.indicator.candle_stick import Candles
 
 
-def market_order(instrument, units, tp_price=None, sl_price=None):
+def market_order(instrument, units, tp_price=None, sl_price=None, tp_pips=None, sl_pips=None):
     data = {
         "order": {
             "timeInForce": "FOK",
@@ -32,6 +32,11 @@ def market_order(instrument, units, tp_price=None, sl_price=None):
         data["order"]["takeProfitOnFill"] = {"price": tp_price}
     if sl_price is not None:
         data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
+
+    if tp_pips is not None:
+        data["order"]["takeProfitOnFill"] = {"distance": tp_pips}
+    if sl_pips is not None:
+        data["order"]["stopLossOnFill"] = {"distance": sl_pips, "timeInForce": "GTC"}
 
     r = orders.OrderCreate(accountID=account_id, data=data)
     client.request(r)
@@ -146,6 +151,72 @@ def open_trades():
     return result
 
 
+def fibonacciWyckoff():
+    o_positions = open_positions()
+    o_trades = open_trades()
+
+    signalList = readSignal()
+    updated = False
+    for line in signalList:
+        signal = parseSignal(line)
+        logging.info("Parsed signal: %s" % signal)
+        if signal.get("symbol", None) is None:
+            logging.warning("No symbol in parsed signal, ignoring signal.")
+            continue
+
+        symbol = signal["symbol"]
+        side = signal.get("side", None)
+        if symbol in o_positions:
+            o_pos = o_positions[symbol]
+            l_units = abs(int(o_pos["long"]["units"]))
+            s_units = abs(int(o_pos["short"]["units"]))
+            if side == "Buy" and l_units > 0:
+                logging.warning(
+                    f"Got Buy signal for {symbol}. But open position already found with units {l_units}. Ignoring singal.")
+                continue
+            if side == "Sell" and s_units > 0:
+                logging.warning(
+                    f"Got Sell signal for {symbol}. But open position already found with units {l_units}. Ignoring singal.")
+                continue
+
+        ledger[symbol] = signal
+
+        if side is not None:
+            qty = 1000
+            if signal["side"] == "Sell":
+                qty *= -1
+            log.info("%s: Market order, Units: %s" % (symbol, qty))
+            market_order(symbol, qty)
+            updated = True
+
+            timeout = 5
+            o_pos = []
+            while timeout > 0:
+                o_positions = open_positions()
+                if symbol in o_positions:
+                    o_pos = o_positions[symbol]
+                    break
+                timeout -= 0.1
+                time.sleep(0.1)
+
+            if len(o_pos) > 0 and symbol in config:
+                pips = config[symbol]["pips"]
+                l_units = abs(int(o_pos["long"]["units"]))
+                s_units = abs(int(o_pos["short"]["units"]))
+                if l_units != 0:
+                    l_price = float(o_pos['long']['averagePrice'])
+                    if signal["side"] == 'Buy':
+                        limit_order(symbol, l_price - pips * 5, qty + 1)
+                        limit_order(symbol, l_price - pips * 5 * 2, qty + 2)
+                        limit_order(symbol, l_price - pips * 5 * 3, qty + 3)
+                if s_units != 0:
+                    s_price = float(o_pos['short']['averagePrice'])
+                    if signal["side"] == 'Sell':
+                        limit_order(symbol, s_price + pips * 5, qty - 1)
+                        limit_order(symbol, s_price + pips * 5 * 2, qty - 2)
+                        limit_order(symbol, s_price + pips * 5 * 3, qty - 3)
+
+
 def readSignal():
     global signalIndex
     with open(signalFile, "r") as f:
@@ -207,8 +278,7 @@ candle_client = Candles(client)
 reconnect = False
 signalIndex = 0
 signalFile = "signal.log"
-ledger = {}
-# readSignal()
+readSignal()
 
 while True:
     try:
@@ -230,60 +300,19 @@ while True:
                 o_pos = o_positions[symbol]
                 l_units = abs(int(o_pos["long"]["units"]))
                 s_units = abs(int(o_pos["short"]["units"]))
-                if side == "Buy" and l_units > 0:
-                    logging.warning(f"Got Buy signal for {symbol}. But open position already found with units {l_units}. Ignoring singal.")
+                if side == "Buy" and s_units > 0:
+                    logging.warning(f"Got Buy signal for {symbol}. But open position already found for Sell with units {s_units}. Ignoring singal.")
                     continue
-                if side == "Sell" and s_units > 0:
-                    logging.warning(f"Got Sell signal for {symbol}. But open position already found with units {l_units}. Ignoring singal.")
+                if side == "Sell" and l_units > 0:
+                    logging.warning(f"Got Sell signal for {symbol}. But open position already found for Buy with units {l_units}. Ignoring singal.")
                     continue
-
-            ledger[symbol] = signal
 
             if side is not None:
                 qty = 1000
-                if signal["side"] == "Sell":
+                if signal["side"] == "Buy":
                     qty *= -1
                 log.info("%s: Market order, Units: %s" % (symbol, qty))
-                market_order(symbol, qty)
-                updated = True
-
-                timeout = 5
-                o_pos = []
-                while timeout > 0:
-                    o_positions = open_positions()
-                    if symbol in o_positions:
-                        o_pos = o_positions[symbol]
-                        break
-                    timeout -= 0.1
-                    time.sleep(0.1)
-
-                if len(o_pos) > 0 and symbol in config:
-                    pips = config[symbol]["pips"]
-                    l_units = abs(int(o_pos["long"]["units"]))
-                    s_units = abs(int(o_pos["short"]["units"]))
-                    if l_units != 0:
-                        l_price = float(o_pos['long']['averagePrice'])
-                        if signal["side"] == 'Buy':
-                            limit_order(symbol, l_price - pips * 5, qty + 1)
-                            limit_order(symbol, l_price - pips * 5 * 2, qty + 2)
-                            limit_order(symbol, l_price - pips * 5 * 3, qty + 3)
-                    if s_units != 0:
-                        s_price = float(o_pos['short']['averagePrice'])
-                        if signal["side"] == 'Sell':
-                            limit_order(symbol, s_price + pips * 5, qty - 1)
-                            limit_order(symbol, s_price + pips * 5 * 2, qty - 2)
-                            limit_order(symbol, s_price + pips * 5 * 3, qty - 3)
-
-            # time.sleep(1)
-            # o_positions = open_positions()
-            # o_trades = open_trades()
-            # o_orders = open_orders()
-            #
-            # for symbol in o_orders.keys():
-            #     o_trd = o_trades[symbol]
-            #     if o_trd.get("stopLossOrder", None) is None:
-            #         amend_trade(o_trd["id"], sl_price=ledger[symbol]["sl"])
-            #         time.sleep(1)
+                market_order(symbol, qty, tp_pips=config[symbol]["pips"] * 10, sl_pips=config[symbol]["pips"] * 30)
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
