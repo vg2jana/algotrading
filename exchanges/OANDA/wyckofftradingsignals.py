@@ -17,6 +17,12 @@ sys.path.append("../../../exchanges")
 from exchanges.OANDA.indicator.candle_stick import Candles
 
 
+def adjustPrecision(value, precision):
+    value = str(value).split('.')
+    value[1] = value[1][:precision]
+    return ".".join(value)
+
+
 def market_order(instrument, units, tp_price=None, sl_price=None, tp_pips=None, sl_pips=None):
     data = {
         "order": {
@@ -28,15 +34,16 @@ def market_order(instrument, units, tp_price=None, sl_price=None, tp_pips=None, 
         }
     }
 
+    precision = config[instrument]["precision"]
     if tp_price is not None:
-        data["order"]["takeProfitOnFill"] = {"price": tp_price}
+        data["order"]["takeProfitOnFill"] = {"price": adjustPrecision(tp_price, precision)}
     if sl_price is not None:
-        data["order"]["stopLossOnFill"] = {"price": "{0:.5f}".format(sl_price), "timeInForce": "GTC"}
+        data["order"]["stopLossOnFill"] = {"price": adjustPrecision(sl_price, precision), "timeInForce": "GTC"}
 
     if tp_pips is not None:
-        data["order"]["takeProfitOnFill"] = {"distance": tp_pips}
+        data["order"]["takeProfitOnFill"] = {"distance": adjustPrecision(tp_pips, precision)}
     if sl_pips is not None:
-        data["order"]["stopLossOnFill"] = {"distance": sl_pips, "timeInForce": "GTC"}
+        data["order"]["stopLossOnFill"] = {"distance": adjustPrecision(sl_pips, precision), "timeInForce": "GTC"}
 
     r = orders.OrderCreate(accountID=account_id, data=data)
     client.request(r)
