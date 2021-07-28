@@ -244,7 +244,7 @@ def parseSignal(data):
         logging.error("Unable to parse signal:\n%s" % data)
         return {}
 
-    m = re.search("(\S+)\s+(Buy|Sell)\s+Alert", data["text"])
+    m = re.search("(\S+)\s+(Buy|Sell)\s+Alert", data.get("text", ""))
     if m is not None:
         result["symbol"] = m.group(1)
         result["side"] = m.group(2)
@@ -277,7 +277,7 @@ account_id = "101-009-13015690-006"
 candle_client = Candles(client)
 reconnect = False
 signalIndex = 0
-signalFile = "signal.log"
+signalFile = "/home/ec2-user/workspace/bottle/out.txt"
 readSignal()
 
 while True:
