@@ -318,8 +318,14 @@ while True:
                 qty = 1000
                 if signal["side"] == "Buy":
                     qty *= -1
+                if "GBP" in symbol or "AUD" in symbol or "NZD" in symbol:
+                    tp_pips = config[symbol]["pips"] * 20
+                    sl_pips = config[symbol]["pips"] * 60
+                else:
+                    tp_pips = config[symbol]["pips"] * 10
+                    sl_pips = config[symbol]["pips"] * 30
                 log.info("%s: Market order, Units: %s" % (symbol, qty))
-                market_order(symbol, qty, tp_pips=config[symbol]["pips"] * 10, sl_pips=config[symbol]["pips"] * 30)
+                market_order(symbol, qty, tp_pips=tp_pips, sl_pips=sl_pips)
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
