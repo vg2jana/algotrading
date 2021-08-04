@@ -267,6 +267,29 @@ def parseSignal(data):
     return result
 
 
+def update_candles(symbol, granularity="M30"):
+    if symbol not in symbolDF.keys():
+        _to = "{}Z".format(datetime.utcnow().isoformat())
+        data = candle_client.fetch_ohlc(symbol, granularity, t_to=_to, count=200)
+        symbolDF[symbol] = pd.DataFrame(data)
+        symbolDF[symbol]["datetime"] = pd.to_datetime(symbolDF[symbol]["datetime"])
+    else:
+        last_time = symbolDF[symbol].iloc[-1]["datetime"]
+        diff = datetime.now(timezone.utc) - last_time.to_pydatetime()
+        if diff.total_seconds() < 60 * 60:
+            return
+        _from = last_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        data = candle_client.fetch_ohlc(symbol, granularity, t_from=_from, includeFirst=False)
+        if len(data) > 0:
+            _df = pd.DataFrame(data)
+            _df["datetime"] = pd.to_datetime(_df["datetime"])
+            symbolDF[symbol] = pd.concat([symbolDF[symbol], _df], ignore_index=True)
+            symbolDF[symbol] = symbolDF[symbol].tail(200)
+            symbolDF[symbol].reset_index(drop=True, inplace=True)
+
+    candle_client.macd(symbolDF[symbol], a=9, b=12, c=26)
+
+
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO, filemode='a',
                     filename='wyckofftradingsignals.log')
 log = logging.getLogger()
@@ -275,6 +298,7 @@ with open('key.json', 'r') as f:
 with open('wyckofftradingsignals.json', 'r') as f:
     params = json.load(f)
 config = params["symbols"]
+symbolDF = {}
 
 log.info("Program S T A R T I N G")
 
@@ -315,17 +339,27 @@ while True:
                     continue
 
             if side is not None:
+                update_candles(symbol)
                 qty = 1000
-                if signal["side"] == "Buy":
+                if signal["side"] == "Sell":
                     qty *= -1
-                if "GBP" in symbol or "AUD" in symbol or "NZD" in symbol:
-                    tp_pips = config[symbol]["pips"] * 20
-                    sl_pips = config[symbol]["pips"] * 60
-                else:
-                    tp_pips = config[symbol]["pips"] * 10
-                    sl_pips = config[symbol]["pips"] * 30
+                # if "GBP" in symbol or "AUD" in symbol or "NZD" in symbol:
+                #     tp_pips = config[symbol]["pips"] * 20
+                #     sl_pips = config[symbol]["pips"] * 60
+                # else:
+                #     tp_pips = config[symbol]["pips"] * 10
+                #     sl_pips = config[symbol]["pips"] * 30
+                # log.info("%s: Market order, Units: %s" % (symbol, qty))
+                # market_order(symbol, qty, tp_pips=tp_pips, sl_pips=sl_pips)
+                macdh = symbolDF[symbol].iloc[-1]["macdh"]
+                if signal["side"] == "Buy" and macdh <= 0:
+                    logging.warning(f"Got Buy signal for {symbol}. But macdh value is {macdh}. Ignoring singal.")
+                    continue
+                if signal["side"] == "Sell" and macdh >= 0:
+                    logging.warning(f"Got Sell signal for {symbol}. But macdh value is {macdh}. Ignoring singal.")
+                    continue
                 log.info("%s: Market order, Units: %s" % (symbol, qty))
-                market_order(symbol, qty, tp_pips=tp_pips, sl_pips=sl_pips)
+                market_order(symbol, qty)
 
     except oandapyV20.exceptions.V20Error as e:
         log.warning(e)
