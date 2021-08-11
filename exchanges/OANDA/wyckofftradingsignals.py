@@ -267,7 +267,7 @@ def parseSignal(data):
     return result
 
 
-def update_candles(symbol, granularity="M30"):
+def update_candles(symbol, granularity="H1"):
     if symbol not in symbolDF.keys():
         _to = "{}Z".format(datetime.utcnow().isoformat())
         data = candle_client.fetch_ohlc(symbol, granularity, t_to=_to, count=200)
@@ -331,15 +331,15 @@ while True:
                 o_pos = o_positions[symbol]
                 l_units = abs(int(o_pos["long"]["units"]))
                 s_units = abs(int(o_pos["short"]["units"]))
-                if side == "Buy" and s_units > 0:
-                    logging.warning(f"Got Buy signal for {symbol}. But open position already found for Sell with units {s_units}. Ignoring singal.")
-                    continue
-                if side == "Sell" and l_units > 0:
-                    logging.warning(f"Got Sell signal for {symbol}. But open position already found for Buy with units {l_units}. Ignoring singal.")
-                    continue
+                # if side == "Buy" and l_units > 0:
+                #     logging.warning(f"Got Buy signal for {symbol}. But open position already found for Sell with units {s_units}. Ignoring singal.")
+                #     continue
+                # if side == "Sell" and s_units > 0:
+                #     logging.warning(f"Got Sell signal for {symbol}. But open position already found for Buy with units {l_units}. Ignoring singal.")
+                #     continue
 
             if side is not None:
-                update_candles(symbol)
+                # update_candles(symbol)
                 qty = 1000
                 if signal["side"] == "Sell":
                     qty *= -1
@@ -351,13 +351,13 @@ while True:
                 #     sl_pips = config[symbol]["pips"] * 30
                 # log.info("%s: Market order, Units: %s" % (symbol, qty))
                 # market_order(symbol, qty, tp_pips=tp_pips, sl_pips=sl_pips)
-                macdh = symbolDF[symbol].iloc[-1]["macdh"]
-                if signal["side"] == "Buy" and macdh <= 0:
-                    logging.warning(f"Got Buy signal for {symbol}. But macdh value is {macdh}. Ignoring singal.")
-                    continue
-                if signal["side"] == "Sell" and macdh >= 0:
-                    logging.warning(f"Got Sell signal for {symbol}. But macdh value is {macdh}. Ignoring singal.")
-                    continue
+                # macdh = symbolDF[symbol].iloc[-1]["macdh"]
+                # if signal["side"] == "Buy" and macdh <= 0:
+                #     logging.warning(f"Got Buy signal for {symbol}. But macdh value is {macdh}. Ignoring singal.")
+                #     continue
+                # if signal["side"] == "Sell" and macdh >= 0:
+                #     logging.warning(f"Got Sell signal for {symbol}. But macdh value is {macdh}. Ignoring singal.")
+                #     continue
                 log.info("%s: Market order, Units: %s" % (symbol, qty))
                 market_order(symbol, qty)
 
