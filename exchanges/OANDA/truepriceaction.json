@@ -1,0 +1,280 @@
+{
+    "symbols": {
+        "AUD_CAD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "AUD_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "AUD_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "AUD_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "AUD_NZD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "AUD_SGD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "AUD_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "CAD_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "CAD_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "CAD_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "CAD_SGD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "CHF_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "CHF_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "CHF_ZAR": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_AUD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_CAD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_CZK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_DKK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_GBP": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_HUF": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "EUR_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "EUR_NOK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_NZD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_PLN": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_SEK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_SGD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_TRY": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "EUR_ZAR": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_AUD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_CAD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "GBP_NZD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_PLN": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_SGD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "GBP_ZAR": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "HKD_JPY": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "NZD_CAD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "NZD_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "NZD_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "NZD_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "NZD_SGD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "NZD_USD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "SGD_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "SGD_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "TRY_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "USD_CAD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_CHF": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_CNH": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_CZK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_DKK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_HKD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_HUF": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "USD_INR": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "USD_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "USD_MXN": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_NOK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_PLN": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_SEK": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_SGD": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_THB": {
+            "pips": 0.01,
+            "precision": 3
+        },
+        "USD_TRY": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "USD_ZAR": {
+            "pips": 0.0001,
+            "precision": 5
+        },
+        "ZAR_JPY": {
+            "pips": 0.01,
+            "precision": 3
+        }
+    }
+}
