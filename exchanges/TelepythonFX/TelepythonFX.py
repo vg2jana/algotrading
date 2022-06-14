@@ -51,8 +51,8 @@ p = 0
 f.seek(p)
 f.read()
 p = f.tell()
+print('\n Waiting for a signal')
 for line in wait_for_signal():
-    print('\n Waiting for a signal')
     try:
         signal = dict(eval(line))
     except Exception as e:
@@ -110,11 +110,11 @@ for line in wait_for_signal():
             "volume": 0.01,
             "type": op_type,
             "price": price,
-            "sl": stop_loss,
-            "tp": take_profit,
+            "sl": float(stop_loss),
+            "tp": float(take_profit),
             "deviation": deviation,
             "magic": 234000,
-            "comment": "TelePython FX copier",
+            "comment": "TP:{}".format(tpList[0]),
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
@@ -135,3 +135,4 @@ for line in wait_for_signal():
                     traderequest_dict = result_dict[field]._asdict()
                     for tradereq_filed in traderequest_dict:
                         print("       traderequest: {}={}".format(tradereq_filed, traderequest_dict[tradereq_filed]))
+    print('\n Waiting for a signal')

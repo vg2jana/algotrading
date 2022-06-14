@@ -23,7 +23,7 @@ client = TelegramClient('anon', api_id, api_hash)
 
 test_channel = -1001504705915 # Test Channel
 telepython_vip_channel = -1001302154811 # TelepythonFX VIP channel
-chatList = [test_channel,]# vip_channel]
+chatList = [telepython_vip_channel, test_channel]
 
 outFile = "C:\\Users\\Administrator\\Documents\\TelepythonFX\\telegram_dump.txt"
 # outFile = "telegram_dump.txt"
